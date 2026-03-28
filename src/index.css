@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #f7f9fb;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    line-height: 1;
+    user-select: none;
+  }
+}
+
+/* ─── CSS Custom Properties ─────────────────────────────────── */
+:root {
+  /*
+   * Islamic geometric pattern — 8-pointed star (khatam) tiled at 60×60px.
+   * Inline SVG data URI, no external asset needed.
+   * Stroke: #004f45 (primary) at opacity 0.35 inside SVG.
+   * The container div adds opacity-[0.04] for the final ~1.4% visual weight —
+   * present on close inspection, invisible at a glance.
+   */
+  --pattern-islamic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23004f45' stroke-width='0.8' opacity='0.35'%3E%3Crect x='15' y='15' width='30' height='30' transform='rotate(45 30 30)'/%3E%3Crect x='18' y='18' width='24' height='24'/%3E%3Cline x1='30' y1='5' x2='30' y2='55'/%3E%3Cline x1='5' y1='30' x2='55' y2='30'/%3E%3Cline x1='9' y1='9' x2='51' y2='51'/%3E%3Cline x1='51' y1='9' x2='9' y2='51'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ─── Count-Up Slide Animation ──────────────────────────────── */
+/*
+ * The metric value text is rendered immediately by React (correct value).
+ * This animation creates a slide-in-from-below + clip-path reveal that
+ * reads perceptually as "the number counted up into place."
+ * Technique: clip-path reveals top-to-bottom while translateY slides up.
+ */
+@keyframes count-up-slide {
+  0%   { opacity: 0; transform: translateY(60%); clip-path: inset(0 0 100% 0); }
+  60%  { opacity: 1; clip-path: inset(0 0 0% 0); }
+  100% { opacity: 1; transform: translateY(0);   clip-path: inset(0 0 0% 0); }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  /* Font family — Plus Jakarta Sans replaces Inter */
+  .font-data {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .font-body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .font-headline {
+    font-family: 'Public Sans', system-ui, sans-serif;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  .tracking-financial {
+    letter-spacing: 0.02em;
+  }
+  .tracking-label {
+    letter-spacing: 0.05em;
+  }
+
+  /* Card hover lift — translateY + shadow escalation */
+  .card-lift {
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  .card-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px 0 rgba(0, 79, 69, 0.14),
+                0 2px 8px 0 rgba(0, 79, 69, 0.06);
+  }
+
+  /* Count-up number reveal — applied to metric value <p> */
+  .animate-count-up {
+    display: inline-block;
+    animation: count-up-slide 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Stagger delay helpers */
+  .animate-delay-0   { animation-delay: 0ms;   }
+  .animate-delay-75  { animation-delay: 75ms;  }
+  .animate-delay-150 { animation-delay: 150ms; }
+  .animate-delay-225 { animation-delay: 225ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+  .animate-delay-600 { animation-delay: 600ms; }
+  .animate-delay-700 { animation-delay: 700ms; }
+}

@@ -1,0 +1,79 @@
+import type { User } from '../types'
+
+export const mockUsers: User[] = [
+  {
+    id:     'u-001',
+    nama:   'Ahmad Fauzi',
+    role:   'admin',
+    unitId: null,
+    email:  'admin@uinpalopo.ac.id',
+    nip:    '197801012005011001',
+  },
+  {
+    id:     'u-002',
+    nama:   'Prof. Dr. H. Hamdan, M.Ag.',
+    role:   'pimpinan',
+    unitId: null,
+    email:  'rektor@uinpalopo.ac.id',
+    nip:    '196505051993031002',
+  },
+  {
+    id:     'u-003',
+    nama:   'Drs. Rizal Mappasomba, M.Si.',
+    role:   'bendahara_induk',
+    unitId: null,
+    email:  'bip@uinpalopo.ac.id',
+    nip:    '197203151999031003',
+  },
+  {
+    id:     'u-004',
+    nama:   'Andi Pratama, S.E.',
+    role:   'bendahara_penerimaan',
+    unitId: null,
+    email:  'bp@uinpalopo.ac.id',
+    nip:    '198506102010011004',
+  },
+  {
+    id:     'u-005',
+    nama:   'Sitti Rahayu, S.E.',
+    role:   'bendahara_pembantu',
+    unitId: 'unit-01',
+    email:  'bpp.ft@uinpalopo.ac.id',
+    nip:    '198812022012012005',
+  },
+  {
+    id:     'u-006',
+    nama:   'Muh. Irfan Taufiq, S.Ak.',
+    role:   'bendahara_pembantu',
+    unitId: 'unit-02',
+    email:  'bpp.fe@uinpalopo.ac.id',
+    nip:    '199001152014011006',
+  },
+  {
+    id:     'u-007',
+    nama:   'Nur Aini Hasanah, S.E.',
+    role:   'bendahara_pembantu',
+    unitId: 'unit-03',
+    email:  'bpp.fush@uinpalopo.ac.id',
+    nip:    '199103202015012007',
+  },
+  {
+    id:     'u-008',
+    nama:   'Hendra Kusuma, S.Ak.',
+    role:   'bendahara_pembantu',
+    unitId: 'unit-04',
+    email:  'bpp.ftk@uinpalopo.ac.id',
+    nip:    '198907112014011008',
+  },
+  {
+    id:     'u-009',
+    nama:   'Fatimah Zahra, S.E.',
+    role:   'bendahara_pembantu',
+    unitId: 'unit-05',
+    email:  'bpp.fk@uinpalopo.ac.id',
+    nip:    '199205252016012009',
+  },
+]
+
+// User aktif saat ini (sesuai design Stitch: Andi Pratama sebagai BP)
+export const currentMockUser = mockUsers.find(u => u.id === 'u-004')!
