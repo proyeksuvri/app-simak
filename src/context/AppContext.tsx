@@ -3,6 +3,17 @@ import type { Session } from '@supabase/supabase-js'
 import type { User } from '../types'
 import { useAuth } from '../hooks/useAuth'
 
+const STORAGE_KEY = 'simak_bku_tahun_anggaran'
+const DEFAULT_YEAR = 2026
+
+function readStoredYear(): number {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) return Number(stored)
+  } catch { /* noop */ }
+  return DEFAULT_YEAR
+}
+
 // Placeholder sementara selama profile diambil di background
 const LOADING_USER: User = {
   id:    '',
@@ -26,8 +37,18 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [tahunAnggaran, setTahunAnggaran] = useState(new Date().getFullYear())
+  const [tahunAnggaran, setTahunAnggaranState] = useState<number>(readStoredYear)
   const { session, profile, loading: authLoading, signIn, signOut } = useAuth()
+
+  const setTahunAnggaran = (year: number) => {
+    try { localStorage.setItem(STORAGE_KEY, String(year)) } catch { /* noop */ }
+    setTahunAnggaranState(year)
+  }
+
+  const handleSignOut = async () => {
+    try { localStorage.removeItem(STORAGE_KEY) } catch { /* noop */ }
+    await signOut()
+  }
 
   const currentUser: User = profile ?? LOADING_USER
 
@@ -39,7 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       session,
       authLoading,
       signIn,
-      signOut,
+      signOut: handleSignOut,
     }}>
       {children}
     </AppContext.Provider>

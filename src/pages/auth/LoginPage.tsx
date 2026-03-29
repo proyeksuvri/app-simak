@@ -1,13 +1,31 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
+import { supabase } from '../../lib/supabase'
 
 export function LoginPage() {
-  const { session, authLoading, signIn } = useAppContext()
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { session, authLoading, signIn, setTahunAnggaran } = useAppContext()
+  const [email,        setEmail]        = useState('')
+  const [password,     setPassword]     = useState('')
+  const [tahunPilihan, setTahunPilihan] = useState(2026)
+  const [availableYears, setAvailableYears] = useState<number[]>([2026])
+  const [submitting,   setSubmitting]   = useState(false)
+  const [error,        setError]        = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase
+      .from('periods')
+      .select('year')
+      .order('year', { ascending: false })
+      .then(({ data }) => {
+        const years = [...new Set((data ?? []).map((p: { year: number }) => p.year))]
+          .filter(Boolean) as number[]
+        if (years.length > 0) {
+          setAvailableYears(years)
+          setTahunPilihan(years[0])
+        }
+      })
+  }, [])
 
   if (authLoading) return null
   if (session) return <Navigate to="/dashboard" replace />
@@ -17,7 +35,9 @@ export function LoginPage() {
     setError(null)
     setSubmitting(true)
     const ok = await signIn(email, password)
-    if (!ok) {
+    if (ok) {
+      setTahunAnggaran(tahunPilihan)
+    } else {
       setError('Email atau kata sandi salah. Periksa kembali.')
     }
     setSubmitting(false)
@@ -50,6 +70,28 @@ export function LoginPage() {
           <h2 className="text-sm font-semibold text-on-surface font-headline mb-5">Masuk ke akun Anda</h2>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {/* Tahun Anggaran */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-on-surface-variant font-body">Tahun Anggaran</label>
+              <div className="relative flex items-center">
+                <span
+                  className="absolute left-3.5 material-symbols-outlined text-[1rem] text-on-surface-variant"
+                  style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}
+                >
+                  calendar_today
+                </span>
+                <select
+                  value={tahunPilihan}
+                  onChange={e => setTahunPilihan(Number(e.target.value))}
+                  className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-surface-container text-sm text-on-surface font-body outline-none focus:ring-2 focus:ring-primary/40 transition-shadow appearance-none cursor-pointer"
+                >
+                  {availableYears.map(y => (
+                    <option key={y} value={y}>TA {y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-on-surface-variant font-body">Email</label>

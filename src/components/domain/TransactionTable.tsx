@@ -10,11 +10,14 @@ import { Modal } from '../ui/Modal'
 import { formatRupiah, formatTanggal } from '../../lib/formatters'
 import { useTransactions } from '../../hooks/useTransactions'
 import { useApproval } from '../../hooks/useApproval'
+import { useMutateTransaction } from '../../hooks/useMutateTransaction'
 import { useAppContext } from '../../context/AppContext'
+import { TransactionFormModal } from './TransactionFormModal'
 
 interface TransactionTableProps {
   filterType?:    TransactionType
   filterStatus?:  Transaction['status']
+  filterUnitId?:  string
   limit?:         number
   onMutated?:     () => void
 }
@@ -23,14 +26,20 @@ const BENDAHARA_ROLES: UserRole[] = [
   'bendahara_penerimaan', 'bendahara_induk', 'bendahara_pembantu',
 ]
 
-export function TransactionTable({ filterType, filterStatus, limit, onMutated }: TransactionTableProps) {
+export function TransactionTable({ filterType, filterStatus, filterUnitId, limit, onMutated }: TransactionTableProps) {
   const { currentUser } = useAppContext()
-  const { transactions, refetch } = useTransactions({ type: filterType, status: filterStatus })
+  const { transactions, refetch } = useTransactions({ type: filterType, status: filterStatus, unitId: filterUnitId })
   const approval = useApproval()
+
+  const { deleteTransaction, saving: deleting } = useMutateTransaction()
 
   const [rejectTarget, setRejectTarget] = useState<string | null>(null)
   const [rejectNote, setRejectNote]     = useState('')
   const [actionError, setActionError]   = useState<string | null>(null)
+  const [editTarget,  setEditTarget]    = useState<Transaction | null>(null)
+  const [deleteTarget,setDeleteTarget]  = useState<Transaction | null>(null)
+  const [selected,    setSelected]      = useState<Set<string>>(new Set())
+  const [bulkSubmitting, setBulkSubmitting] = useState(false)
 
   const rows = limit ? transactions.slice(0, limit) : transactions
 
@@ -38,6 +47,43 @@ export function TransactionTable({ filterType, filterStatus, limit, onMutated }:
   const isBendahara = BENDAHARA_ROLES.includes(role)
   const canApprove  = role === 'pimpinan' || role === 'admin'
   const showActions = isBendahara || canApprove
+
+  // Rows eligible for bulk submit: bendahara + status pending
+  const selectableIds = isBendahara ? rows.filter(t => t.status === 'pending').map(t => t.id) : []
+  const allSelected   = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
+  const someSelected  = selected.size > 0
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(prev => { const next = new Set(prev); selectableIds.forEach(id => next.delete(id)); return next })
+    } else {
+      setSelected(prev => new Set([...prev, ...selectableIds]))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const handleBulkSubmit = async () => {
+    setBulkSubmitting(true)
+    setActionError(null)
+    const ids = [...selected]
+    let firstErr: string | null = null
+    for (const id of ids) {
+      const err = await approval.submit(id)
+      if (err && !firstErr) firstErr = err
+    }
+    setBulkSubmitting(false)
+    setSelected(new Set())
+    if (firstErr) setActionError(firstErr)
+    refetch()
+    onMutated?.()
+  }
 
   const handleSubmit = async (txId: string) => {
     setActionError(null)
@@ -71,6 +117,12 @@ export function TransactionTable({ filterType, filterStatus, limit, onMutated }:
     onMutated?.()
   }
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    const ok = await deleteTransaction(deleteTarget.id)
+    if (ok) { setDeleteTarget(null); refetch(); onMutated?.() }
+  }
+
   if (rows.length === 0) {
     return <EmptyState icon="receipt_long" title="Belum ada transaksi" message="Transaksi akan muncul di sini setelah diinput." />
   }
@@ -83,8 +135,39 @@ export function TransactionTable({ filterType, filterStatus, limit, onMutated }:
         </div>
       )}
 
+      {/* Bulk action bar */}
+      {isBendahara && selectableIds.length > 0 && (
+        <div className="mb-3 flex items-center gap-3">
+          <span className="text-sm text-on-surface-variant font-body">
+            {someSelected ? `${selected.size} transaksi dipilih` : `${selectableIds.length} transaksi siap diajukan`}
+          </span>
+          {someSelected && (
+            <Button
+              variant="primary"
+              size="sm"
+              icon="send"
+              disabled={bulkSubmitting}
+              onClick={handleBulkSubmit}
+            >
+              {bulkSubmitting ? 'Mengajukan...' : `Ajukan ${selected.size} Transaksi`}
+            </Button>
+          )}
+        </div>
+      )}
+
       <Table>
         <TableHead>
+          {isBendahara && selectableIds.length > 0 && (
+            <TableHeadCell align="center">
+              <input
+                type="checkbox"
+                className="w-4 h-4 accent-primary cursor-pointer"
+                checked={allSelected}
+                onChange={toggleSelectAll}
+                title="Pilih semua"
+              />
+            </TableHeadCell>
+          )}
           <TableHeadCell>Tanggal</TableHeadCell>
           <TableHeadCell>No. Bukti</TableHeadCell>
           <TableHeadCell>Deskripsi</TableHeadCell>
@@ -105,13 +188,58 @@ export function TransactionTable({ filterType, filterStatus, limit, onMutated }:
               submitting={approval.submitting}
               approving={approval.approving}
               rejecting={approval.rejecting}
+              showCheckbox={isBendahara && selectableIds.length > 0}
+              checked={selected.has(t.id)}
+              onToggleCheck={t.status === 'pending' ? () => toggleSelect(t.id) : undefined}
               onSubmit={handleSubmit}
               onApprove={handleApprove}
               onReject={openReject}
+              onEdit={t => setEditTarget(t)}
+              onDelete={t => setDeleteTarget(t)}
             />
           ))}
         </TableBody>
       </Table>
+
+      {/* Modal edit transaksi */}
+      {editTarget && (
+        <TransactionFormModal
+          open={editTarget !== null}
+          onClose={() => setEditTarget(null)}
+          txType={editTarget.type === 'penerimaan' ? 'IN' : 'OUT'}
+          onSuccess={() => { refetch(); onMutated?.() }}
+          editTx={editTarget}
+        />
+      )}
+
+      {/* Modal konfirmasi hapus */}
+      <Modal
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        title="Hapus Transaksi"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface-variant font-body">
+            Yakin ingin menghapus transaksi{' '}
+            <span className="font-semibold text-on-surface">{deleteTarget?.nomorBukti}</span>?
+            Tindakan ini tidak dapat diurungkan.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>
+              Batal
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="bg-error text-on-error hover:bg-error/90"
+              disabled={deleting}
+              onClick={handleDeleteConfirm}
+            >
+              {deleting ? 'Menghapus...' : 'Hapus'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modal konfirmasi tolak */}
       <Modal
@@ -154,27 +282,47 @@ export function TransactionTable({ filterType, filterStatus, limit, onMutated }:
 }
 
 interface RowProps {
-  transaction:  Transaction
-  even:         boolean
-  showActions:  boolean
-  isBendahara:  boolean
-  canApprove:   boolean
-  submitting:   boolean
-  approving:    boolean
-  rejecting:    boolean
-  onSubmit:     (id: string) => void
-  onApprove:    (id: string) => void
-  onReject:     (id: string) => void
+  transaction:    Transaction
+  even:           boolean
+  showActions:    boolean
+  isBendahara:    boolean
+  canApprove:     boolean
+  submitting:     boolean
+  approving:      boolean
+  rejecting:      boolean
+  showCheckbox:   boolean
+  checked:        boolean
+  onToggleCheck?: () => void
+  onSubmit:       (id: string) => void
+  onApprove:      (id: string) => void
+  onReject:       (id: string) => void
+  onEdit:         (tx: Transaction) => void
+  onDelete:       (tx: Transaction) => void
 }
 
 function TransactionRow({
   transaction: t, even,
   showActions, isBendahara, canApprove,
   submitting, approving, rejecting,
-  onSubmit, onApprove, onReject,
+  showCheckbox, checked, onToggleCheck,
+  onSubmit, onApprove, onReject, onEdit, onDelete,
 }: RowProps) {
   return (
     <TableRow even={even}>
+      {showCheckbox && (
+        <TableCell align="center">
+          {onToggleCheck ? (
+            <input
+              type="checkbox"
+              className="w-4 h-4 accent-primary cursor-pointer"
+              checked={checked}
+              onChange={onToggleCheck}
+            />
+          ) : (
+            <span className="w-4 h-4 block" />
+          )}
+        </TableCell>
+      )}
       <TableCell>
         <span className="text-xs text-on-surface-variant font-body">{formatTanggal(t.tanggal)}</span>
       </TableCell>
@@ -209,15 +357,30 @@ function TransactionRow({
         <TableCell align="center">
           <div className="flex items-center justify-center gap-1.5">
             {isBendahara && t.status === 'pending' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                icon="send"
-                disabled={submitting}
-                onClick={() => onSubmit(t.id)}
-              >
-                Ajukan
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="edit"
+                  onClick={() => onEdit(t)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="delete"
+                  className="text-error"
+                  onClick={() => onDelete(t)}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="send"
+                  disabled={submitting}
+                  onClick={() => onSubmit(t.id)}
+                >
+                  Ajukan
+                </Button>
+              </>
             )}
             {canApprove && t.status === 'diajukan' && (
               <>

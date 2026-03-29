@@ -10,11 +10,40 @@ const typeIcons: Record<ApprovalItem['type'], string> = {
 }
 
 interface PendingApprovalsProps {
-  items: ApprovalItem[]
+  items:    ApprovalItem[]
+  loading?: boolean
 }
 
-export function PendingApprovals({ items }: PendingApprovalsProps) {
-  if (items.length === 0) return null
+export function PendingApprovals({ items, loading }: PendingApprovalsProps) {
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2].map(i => (
+          <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-container-lowest animate-pulse">
+            <div className="w-8 h-8 rounded-lg bg-surface-container-high flex-shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3 bg-surface-container-high rounded w-3/4" />
+              <div className="h-2.5 bg-surface-container-high rounded w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-6 text-center">
+        <span
+          className="material-symbols-outlined text-on-surface-variant/40 text-[2.5rem] mb-2"
+          style={{ fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 40" }}
+        >
+          check_circle
+        </span>
+        <p className="text-sm text-on-surface-variant font-body">Tidak ada transaksi menunggu</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">

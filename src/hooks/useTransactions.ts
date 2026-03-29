@@ -56,9 +56,10 @@ export function useTransactions(filter: FilterOptions = {}) {
         nominal:        Number(r.amount),
         type:           mapType(r.type),
         status:         mapStatus(r.status),
-        nomorBukti:     r.no_bukti ?? '-',
-        unitId:         r.work_unit_id,
-        createdBy:      r.created_by ?? '',
+        nomorBukti:      r.no_bukti ?? '-',
+        unitId:          r.work_unit_id,
+        sourceAccountId: r.source_account_id ?? null,
+        createdBy:       r.created_by ?? '',
         approvedBy:     (r as any).approved_by ?? null,
         rejectionNote:  (r as any).rejection_note ?? null,
       }))

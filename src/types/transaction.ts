@@ -19,16 +19,17 @@ export type KategoriPengeluaran =
 export type KategoriTransaksi = KategoriPenerimaan | KategoriPengeluaran
 
 export interface Transaction {
-  id:             string
-  tanggal:        string            // ISO date string YYYY-MM-DD
-  deskripsi:      string
-  kategori:       KategoriTransaksi
-  nominal:        number            // dalam rupiah (integer)
-  type:           TransactionType
-  status:         TransactionStatus
-  nomorBukti:     string            // BPN-001 atau BPK-001
-  unitId:         string | null     // null = transaksi pusat
-  createdBy:      string            // user id
-  approvedBy:     string | null
-  rejectionNote:  string | null
+  id:               string
+  tanggal:          string            // ISO date string YYYY-MM-DD
+  deskripsi:        string
+  kategori:         KategoriTransaksi
+  nominal:          number            // dalam rupiah (integer)
+  type:             TransactionType
+  status:           TransactionStatus
+  nomorBukti:       string            // BPN-001 atau BPK-001
+  unitId:           string | null     // null = transaksi pusat
+  sourceAccountId:  string | null     // rekening bank penerimaan
+  createdBy:        string            // user id
+  approvedBy:       string | null
+  rejectionNote:    string | null
 }

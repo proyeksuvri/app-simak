@@ -4,6 +4,7 @@ import { Button }               from '../ui/Button'
 import { useWorkUnits }         from '../../hooks/useWorkUnits'
 import { usePeriods }           from '../../hooks/usePeriods'
 import { useMutateTransaction } from '../../hooks/useMutateTransaction'
+import { useBankAccounts }      from '../../hooks/useBankAccounts'
 import type { KategoriPenerimaan, KategoriPengeluaran } from '../../types'
 
 // ── Field helpers ──────────────────────────────────────────────────────────────
@@ -37,29 +38,34 @@ function parseRupiah(formatted: string): number {
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
+import type { Transaction } from '../../types'
+
 interface TransactionFormModalProps {
   open:      boolean
   onClose:   () => void
   txType:    'IN' | 'OUT'
   onSuccess: () => void
+  editTx?:   Transaction   // jika diisi → mode edit
 }
 
 interface FormState {
-  transaction_date: string
-  no_bukti:         string
-  description:      string
-  kode_rekening:    string
-  amountFormatted:  string
-  work_unit_id:     string
+  transaction_date:  string
+  no_bukti:          string
+  description:       string
+  kode_rekening:     string
+  amountFormatted:   string
+  work_unit_id:      string
+  bank_account_id:   string
 }
 
 const emptyForm = (): FormState => ({
-  transaction_date: new Date().toISOString().slice(0, 10),
-  no_bukti:         '',
-  description:      '',
-  kode_rekening:    '',
-  amountFormatted:  '',
-  work_unit_id:     '',
+  transaction_date:  new Date().toISOString().slice(0, 10),
+  no_bukti:          '',
+  description:       '',
+  kode_rekening:     '',
+  amountFormatted:   '',
+  work_unit_id:      '',
+  bank_account_id:   '',
 })
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -69,21 +75,41 @@ export function TransactionFormModal({
   onClose,
   txType,
   onSuccess,
+  editTx,
 }: TransactionFormModalProps) {
   const { workUnits } = useWorkUnits()
   const { activePeriod } = usePeriods()
-  const { insertTransaction, saving, error } = useMutateTransaction()
+  const { insertTransaction, updateTransaction, saving, error } = useMutateTransaction()
+  const { accounts: bankAccounts } = useBankAccounts(true)
 
   const [form, setForm]           = useState<FormState>(emptyForm)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({})
 
-  // Reset form setiap kali modal dibuka
+  const isEdit = !!editTx
+
+  // Reset / pre-fill form setiap kali modal dibuka
   useEffect(() => {
-    if (open) { setForm(emptyForm()); setFieldErrors({}) }
-  }, [open])
+    if (!open) return
+    if (editTx) {
+      setForm({
+        transaction_date:  editTx.tanggal,
+        no_bukti:          editTx.nomorBukti === '-' ? '' : editTx.nomorBukti,
+        description:       editTx.deskripsi,
+        kode_rekening:     editTx.kategori,
+        amountFormatted:   editTx.nominal.toLocaleString('id-ID'),
+        work_unit_id:      editTx.unitId ?? '',
+        bank_account_id:   editTx.sourceAccountId ?? '',
+      })
+    } else {
+      setForm(emptyForm())
+    }
+    setFieldErrors({})
+  }, [open, editTx])
 
   const isBPN   = txType === 'IN'
-  const title   = isBPN ? 'Input BPN — Bukti Penerimaan' : 'Input BPK — Bukti Pengeluaran'
+  const title   = isEdit
+    ? (isBPN ? 'Edit BPN — Bukti Penerimaan' : 'Edit BPK — Bukti Pengeluaran')
+    : (isBPN ? 'Input BPN — Bukti Penerimaan' : 'Input BPK — Bukti Pengeluaran')
   const kategoriList = isBPN ? KATEGORI_PENERIMAAN : KATEGORI_PENGELUARAN
 
   function set(field: keyof FormState, value: string) {
@@ -97,6 +123,7 @@ export function TransactionFormModal({
     if (!form.description.trim()) errs.description    = 'Uraian wajib diisi'
     if (!form.kode_rekening)      errs.kode_rekening  = 'Kategori wajib dipilih'
     if (parseRupiah(form.amountFormatted) <= 0) errs.amountFormatted = 'Nominal harus lebih dari 0'
+    if (!form.bank_account_id) errs.bank_account_id = 'Rekening bank wajib dipilih'
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -105,16 +132,21 @@ export function TransactionFormModal({
     e.preventDefault()
     if (!validate()) return
 
-    const ok = await insertTransaction({
-      type:             txType,
-      transaction_date: form.transaction_date,
-      no_bukti:         form.no_bukti,
-      description:      form.description,
-      kode_rekening:    form.kode_rekening,
-      amount:           parseRupiah(form.amountFormatted),
-      work_unit_id:     form.work_unit_id || null,
-      period_id:        activePeriod?.id ?? null,
-    })
+    const payload = {
+      type:              txType,
+      transaction_date:  form.transaction_date,
+      no_bukti:          form.no_bukti,
+      description:       form.description,
+      kode_rekening:     form.kode_rekening,
+      amount:            parseRupiah(form.amountFormatted),
+      work_unit_id:      form.work_unit_id || null,
+      period_id:         activePeriod?.id ?? null,
+      source_account_id: form.bank_account_id || null,
+    }
+
+    const ok = isEdit && editTx
+      ? await updateTransaction(editTx.id, payload)
+      : await insertTransaction(payload)
     if (ok) { onSuccess(); onClose() }
   }
 
@@ -188,6 +220,26 @@ export function TransactionFormModal({
             </Field>
           </div>
 
+          {/* Rekening Bank — wajib untuk BPN dan BPK */}
+          <Field
+            label={isBPN ? 'Rekening Bank Penerimaan' : 'Rekening Bank Pengeluaran'}
+            error={fieldErrors.bank_account_id}
+            required
+          >
+            <select
+              value={form.bank_account_id}
+              onChange={e => set('bank_account_id', e.target.value)}
+              className={inputCls(!!fieldErrors.bank_account_id)}
+            >
+              <option value="">— Pilih Rekening Bank —</option>
+              {bankAccounts.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.bank_name} — {a.account_number} a.n. {a.account_name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
           {/* Unit Kerja */}
           <Field label="Unit Kerja" hint="Opsional — kosongkan untuk transaksi pusat">
             <select
@@ -226,7 +278,7 @@ export function TransactionFormModal({
             Batal
           </Button>
           <Button type="submit" variant="primary" size="sm" disabled={saving} icon={saving ? undefined : 'save'}>
-            {saving ? 'Menyimpan…' : 'Simpan sebagai Draft'}
+            {saving ? 'Menyimpan…' : isEdit ? 'Simpan Perubahan' : 'Simpan sebagai Draft'}
           </Button>
         </div>
       </form>

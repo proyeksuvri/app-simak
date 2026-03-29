@@ -9,9 +9,10 @@ import { useUsers } from '../../hooks/useUsers'
 import { useManagePeriods } from '../../hooks/useManagePeriods'
 import { useUserManagement, type CreateUserPayload, type EditUserPayload, type UserRole, type BendaharaKategori } from '../../hooks/useUserManagement'
 import { useWorkUnits } from '../../hooks/useWorkUnits'
+import { useBankAccounts, useManageBankAccounts, type BankAccountInput } from '../../hooks/useBankAccounts'
 import { USER_ROLE_LABELS } from '../../types'
 
-type PengaturanTab = 'profil' | 'periode' | 'user'
+type PengaturanTab = 'profil' | 'periode' | 'user' | 'rekening'
 
 export function PengaturanPage() {
   const { currentUser, tahunAnggaran } = useAppContext()
@@ -67,6 +68,7 @@ export function PengaturanPage() {
           <>
             <TabButton label="Periode" active={activeTab === 'periode'} onClick={() => setManualTab('periode')} />
             <TabButton label="User" active={activeTab === 'user'} onClick={() => setManualTab('user')} />
+            <TabButton label="Rekening Bank" active={activeTab === 'rekening'} onClick={() => setManualTab('rekening')} />
           </>
         )}
       </div>
@@ -193,6 +195,10 @@ export function PengaturanPage() {
       {activeTab === 'user' && isAdmin && (
         <UserTab usersState={usersState} currentUserId={currentUser.id} />
       )}
+
+      {activeTab === 'rekening' && isAdmin && (
+        <RekeningTab />
+      )}
     </PageContainer>
   )
 }
@@ -212,6 +218,161 @@ function TabButton({
     >
       {label}
     </button>
+  )
+}
+
+// ─── Tab Rekening Bank ───────────────────────────────────────────────────────
+
+const EMPTY_REKENING: BankAccountInput = { bank_name: '', account_number: '', account_name: '' }
+
+function RekeningTab() {
+  const { accounts, loading, refetch } = useBankAccounts()
+  const { createAccount, toggleActive, saving, error } = useManageBankAccounts()
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm]           = useState<BankAccountInput>(EMPTY_REKENING)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [success, setSuccess]     = useState<string | null>(null)
+
+  const openModal = () => { setForm(EMPTY_REKENING); setFormError(null); setModalOpen(true) }
+
+  const handleCreate = async () => {
+    setFormError(null)
+    if (!form.bank_name || !form.account_number || !form.account_name) {
+      setFormError('Semua field wajib diisi.'); return
+    }
+    const err = await createAccount(form)
+    if (err) { setFormError(err); return }
+    setModalOpen(false)
+    setSuccess('Rekening berhasil ditambahkan.')
+    refetch()
+    setTimeout(() => setSuccess(null), 4000)
+  }
+
+  const handleToggle = async (id: string, current: boolean) => {
+    await toggleActive(id, !current)
+    refetch()
+  }
+
+  return (
+    <>
+      <Card padding="sm">
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-on-surface font-headline">Rekening Bank Penerimaan</h3>
+            <p className="text-xs text-on-surface-variant font-body mt-0.5">
+              {accounts.length} rekening terdaftar
+            </p>
+          </div>
+          <Button variant="primary" size="sm" icon="add" onClick={openModal}>
+            Tambah Rekening
+          </Button>
+        </div>
+
+        {success && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
+            {success}
+          </div>
+        )}
+        {error && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="px-4 py-8 text-sm text-on-surface-variant font-body animate-pulse text-center">Memuat...</p>
+        ) : accounts.length === 0 ? (
+          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
+            Belum ada rekening. Klik "Tambah Rekening" untuk menambahkan.
+          </p>
+        ) : (
+          <table className="w-full text-sm font-body mt-1">
+            <thead className="bg-surface-container-low">
+              <tr>
+                {['Bank', 'No. Rekening', 'Atas Nama', 'Status', 'Aksi'].map(h => (
+                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((a, idx) => (
+                <tr key={a.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
+                  <td className="px-4 py-2.5 text-on-surface font-medium">{a.bank_name}</td>
+                  <td className="px-4 py-2.5 text-on-surface">{a.account_number}</td>
+                  <td className="px-4 py-2.5 text-on-surface">{a.account_name}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={[
+                      'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                      a.is_active
+                        ? 'bg-primary-fixed text-on-primary-fixed-variant'
+                        : 'bg-surface-container text-on-surface-variant',
+                    ].join(' ')}>
+                      {a.is_active ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      className={`text-xs hover:underline disabled:opacity-50 ${a.is_active ? 'text-error' : 'text-primary'}`}
+                      disabled={saving}
+                      onClick={() => handleToggle(a.id, a.is_active)}
+                    >
+                      {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Tambah Rekening Bank">
+        <div className="px-6 py-5 space-y-4">
+          <FormField label="Nama Bank" icon="account_balance">
+            <input
+              type="text"
+              placeholder="Contoh: Bank BRI"
+              className={inputCls}
+              value={form.bank_name}
+              onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))}
+            />
+          </FormField>
+          <FormField label="Nomor Rekening" icon="tag">
+            <input
+              type="text"
+              placeholder="Contoh: 0001-01-000001-30-7"
+              className={inputCls}
+              value={form.account_number}
+              onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))}
+            />
+          </FormField>
+          <FormField label="Atas Nama" icon="badge">
+            <input
+              type="text"
+              placeholder="Contoh: UIN Palopo - Penerimaan UKT"
+              className={inputCls}
+              value={form.account_name}
+              onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))}
+            />
+          </FormField>
+
+          {formError && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>
+              {formError}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>Batal</Button>
+            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleCreate}>
+              {saving ? 'Menyimpan...' : 'Simpan'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }
 

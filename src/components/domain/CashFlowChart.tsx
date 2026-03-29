@@ -7,7 +7,9 @@ import { colors } from '../../design-tokens/colors'
 import { formatRupiahSingkat, formatRupiah } from '../../lib/formatters'
 
 interface CashFlowChartProps {
-  data: ChartDataPoint[]
+  data:             ChartDataPoint[]
+  showPenerimaan?:  boolean
+  showPengeluaran?: boolean
 }
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -26,7 +28,7 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-export function CashFlowChart({ data }: CashFlowChartProps) {
+export function CashFlowChart({ data, showPenerimaan = true, showPengeluaran = true }: CashFlowChartProps) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
@@ -55,25 +57,29 @@ export function CashFlowChart({ data }: CashFlowChartProps) {
           iconType="circle"
           iconSize={8}
         />
-        <Line
-          type="monotone"
-          dataKey="penerimaan"
-          name="Penerimaan"
-          stroke={colors.primary}
-          strokeWidth={2.5}
-          dot={{ fill: colors.primary, r: 3 }}
-          activeDot={{ r: 5, fill: colors.primary }}
-        />
-        <Line
-          type="monotone"
-          dataKey="pengeluaran"
-          name="Pengeluaran"
-          stroke={colors.tertiary}
-          strokeWidth={2.5}
-          dot={{ fill: colors.tertiary, r: 3 }}
-          activeDot={{ r: 5, fill: colors.tertiary }}
-          strokeDasharray="5 3"
-        />
+        {showPenerimaan && (
+          <Line
+            type="monotone"
+            dataKey="penerimaan"
+            name="Penerimaan"
+            stroke={colors.primary}
+            strokeWidth={2.5}
+            dot={{ fill: colors.primary, r: 3 }}
+            activeDot={{ r: 5, fill: colors.primary }}
+          />
+        )}
+        {showPengeluaran && (
+          <Line
+            type="monotone"
+            dataKey="pengeluaran"
+            name="Pengeluaran"
+            stroke={colors.tertiary}
+            strokeWidth={2.5}
+            dot={{ fill: colors.tertiary, r: 3 }}
+            activeDot={{ r: 5, fill: colors.tertiary }}
+            strokeDasharray="5 3"
+          />
+        )}
       </LineChart>
     </ResponsiveContainer>
   )

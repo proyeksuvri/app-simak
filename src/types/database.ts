@@ -1,5 +1,15 @@
 // Auto-generated shape matching Supabase schema (bqlrbdzmexmjcumechmt)
 
+export interface DbBankAccount {
+  id:             string
+  tenant_id:      string
+  bank_name:      string
+  account_number: string
+  account_name:   string
+  is_active:      boolean
+  created_at:     string | null
+}
+
 export type TransactionType   = 'IN' | 'OUT' | 'TRANSFER'
 export type TransactionStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'POSTED'
 

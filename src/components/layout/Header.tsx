@@ -2,7 +2,7 @@ import { useAppContext } from '../../context/AppContext'
 import { USER_ROLE_LABELS } from '../../types'
 
 export function Header() {
-  const { currentUser, tahunAnggaran, setTahunAnggaran } = useAppContext()
+  const { currentUser, tahunAnggaran } = useAppContext()
 
   const greeting = () => {
     const hour = new Date().getHours()
@@ -44,15 +44,9 @@ export function Header() {
           >
             calendar_today
           </span>
-          <select
-            value={tahunAnggaran}
-            onChange={e => setTahunAnggaran(Number(e.target.value))}
-            className="text-sm font-medium text-on-surface bg-transparent font-body outline-none cursor-pointer"
-          >
-            {[2022, 2023, 2024].map(y => (
-              <option key={y} value={y}>TA {y}</option>
-            ))}
-          </select>
+          <span className="text-sm font-medium text-on-surface font-body">
+            TA {tahunAnggaran}
+          </span>
         </div>
 
         <button className="relative w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors">
