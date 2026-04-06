@@ -19,7 +19,7 @@
  * - unit_kerja         : nama unit kerja (opsional, partial match)
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { Modal }               from '../ui/Modal'
 import { Button }              from '../ui/Button'
@@ -267,7 +267,7 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
   }, [revCats, accounts]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Proses file ─────────────────────────────────────────────────────────────
-  const processFile = useCallback((file: File) => {
+  const processFile = (file: File) => {
     setResults(null)
     setFileName(file.name)
 
@@ -285,7 +285,7 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
       }
     }
     reader.readAsArrayBuffer(file)
-  }, [txType]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -440,16 +440,16 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
               'border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors',
               dragOver
                 ? 'border-primary bg-primary/10'
-                : 'border-outline-variant hover:border-primary hover:bg-surface-container',
+                : 'border-white/20 hover:border-[#86efac] hover:bg-white/5',
             ].join(' ')}
           >
-            <span className="material-symbols-outlined text-5xl text-on-surface-variant block mb-3">
+            <span className="material-symbols-outlined text-5xl text-[#bfc8c4] block mb-3">
               upload_file
             </span>
-            <p className="text-body-large text-on-surface font-medium">
+            <p className="text-body-large text-[#e8eaf0] font-medium">
               Klik atau seret file ke sini
             </p>
-            <p className="text-body-small text-on-surface-variant mt-1">
+            <p className="text-body-small text-[#bfc8c4] mt-1">
               Format yang didukung: <strong>.xlsx</strong>, <strong>.xls</strong>, <strong>.csv</strong>
             </p>
             <input
@@ -464,21 +464,21 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
 
         {/* ── Ringkasan File ───────────────────────────────────────────────── */}
         {hasRows && !results && (
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-container">
-            <span className="material-symbols-outlined text-primary">description</span>
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#1e2430] border border-[#2a303c]">
+            <span className="material-symbols-outlined text-[#86efac]">description</span>
             <div className="flex-1 min-w-0">
-              <p className="text-body-medium text-on-surface font-medium truncate">{fileName}</p>
-              <p className="text-body-small text-on-surface-variant">
+              <p className="text-body-medium text-[#e8eaf0] font-medium truncate">{fileName}</p>
+              <p className="text-body-small text-[#bfc8c4]">
                 {rows.length} baris ditemukan &bull;{' '}
-                <span className="text-[#4ade80]">{validCount} valid</span>
+                <span className="text-[#86efac]">{validCount} valid</span>
                 {invalidCount > 0 && (
-                  <span className="text-[#f87171]"> &bull; {invalidCount} error</span>
+                  <span className="text-[#fca5a5]"> &bull; {invalidCount} error</span>
                 )}
               </p>
             </div>
             <button
               onClick={() => { setRows([]); setFileName('') }}
-              className="p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+              className="p-1 rounded-full text-[#bfc8c4] hover:bg-white/10 transition-colors"
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.125rem' }}>close</span>
             </button>
@@ -487,27 +487,27 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
 
         {/* ── Tabel Preview ────────────────────────────────────────────────── */}
         {hasRows && !results && (
-          <div className="overflow-x-auto rounded-xl border border-outline-variant max-h-72">
+          <div className="overflow-x-auto rounded-xl border border-white/10 max-h-72" style={{ colorScheme: 'dark' }}>
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-surface-container-high">
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">#</th>
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Tanggal</th>
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">No Bukti</th>
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Deskripsi</th>
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Kategori</th>
-                  <th className="px-3 py-2 text-right text-on-surface-variant font-medium">Nominal</th>
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Rekening</th>
+                <tr className="bg-[#1e2430] border-b border-white/10">
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">#</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Tanggal</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">No Bukti</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Deskripsi</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Kategori</th>
+                  <th className="px-3 py-2 text-right text-[#e8eaf0] font-medium">Nominal</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Rekening</th>
                   {txType === 'IN' && (
-                    <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Jenis Pend.</th>
+                    <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Jenis Pend.</th>
                   )}
                   {txType === 'IN' && (
-                    <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Sumber Pend.</th>
+                    <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Sumber Pend.</th>
                   )}
                   {!lockedUnitId && (
-                    <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Unit Kerja</th>
+                    <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Unit Kerja</th>
                   )}
-                  <th className="px-3 py-2 text-left text-on-surface-variant font-medium">Status</th>
+                  <th className="px-3 py-2 text-left text-[#e8eaf0] font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -516,33 +516,33 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
                   return (
                     <tr
                       key={row.rowNum}
-                      className={isValid ? 'border-t border-outline-variant/30' : 'border-t border-outline-variant/30 bg-[#f87171]/8'}
+                      className={isValid ? 'border-t border-white/5' : 'border-t border-white/5 bg-[#fca5a5]/10'}
                     >
-                      <td className="px-3 py-1.5 text-on-surface-variant">{row.rowNum}</td>
-                      <td className="px-3 py-1.5 text-on-surface font-mono">{row.tanggal || <span className="text-[#f87171]">—</span>}</td>
-                      <td className="px-3 py-1.5 text-on-surface-variant">{row.no_bukti || '—'}</td>
-                      <td className="px-3 py-1.5 text-on-surface max-w-[160px] truncate">{row.deskripsi}</td>
-                      <td className="px-3 py-1.5 text-on-surface">{row.kode_rekening}</td>
-                      <td className="px-3 py-1.5 text-right text-on-surface font-mono">{formatRupiah(row.nominal)}</td>
-                      <td className="px-3 py-1.5 text-on-surface-variant max-w-[120px] truncate">{row.rekening_bank_raw}</td>
+                      <td className="px-3 py-1.5 text-[#bfc8c4]">{row.rowNum}</td>
+                      <td className="px-3 py-1.5 text-[#e8eaf0] font-mono">{row.tanggal || <span className="text-[#fca5a5]">—</span>}</td>
+                      <td className="px-3 py-1.5 text-[#bfc8c4]">{row.no_bukti || '—'}</td>
+                      <td className="px-3 py-1.5 text-[#e8eaf0] max-w-[160px] truncate">{row.deskripsi}</td>
+                      <td className="px-3 py-1.5 text-[#e8eaf0]">{row.kode_rekening}</td>
+                      <td className="px-3 py-1.5 text-right text-[#e8eaf0] font-mono">{formatRupiah(row.nominal)}</td>
+                      <td className="px-3 py-1.5 text-[#bfc8c4] max-w-[120px] truncate">{row.rekening_bank_raw}</td>
                       {txType === 'IN' && (
-                        <td className="px-3 py-1.5 text-on-surface-variant">{row.jenis_pendapatan || '—'}</td>
+                        <td className="px-3 py-1.5 text-[#bfc8c4]">{row.jenis_pendapatan || '—'}</td>
                       )}
                       {txType === 'IN' && (
-                        <td className="px-3 py-1.5 text-on-surface-variant">{row.sumber_pendapatan || '—'}</td>
+                        <td className="px-3 py-1.5 text-[#bfc8c4]">{row.sumber_pendapatan || '—'}</td>
                       )}
                       {!lockedUnitId && (
-                        <td className="px-3 py-1.5 text-on-surface-variant">{row.unit_kerja || '—'}</td>
+                        <td className="px-3 py-1.5 text-[#bfc8c4]">{row.unit_kerja || '—'}</td>
                       )}
                       <td className="px-3 py-1.5">
                         {isValid ? (
-                          <span className="inline-flex items-center gap-1 text-[#4ade80]">
+                          <span className="inline-flex items-center gap-1 text-[#86efac]">
                             <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>check_circle</span>
                             Valid
                           </span>
                         ) : (
                           <span
-                            className="inline-flex items-center gap-1 text-[#f87171] cursor-help"
+                            className="inline-flex items-center gap-1 text-[#fca5a5] cursor-help"
                             title={row.errors.join('\n')}
                           >
                             <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>error</span>
@@ -560,11 +560,11 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
 
         {/* ── Daftar Error ─────────────────────────────────────────────────── */}
         {hasRows && !results && invalidCount > 0 && (
-          <div className="rounded-xl bg-[#f87171]/10 border border-[#f87171]/30 p-4 space-y-2 max-h-40 overflow-y-auto">
-            <p className="text-body-small font-semibold text-[#f87171]">Detail Error:</p>
+          <div className="rounded-xl bg-[#fca5a5]/10 border border-[#fca5a5]/30 p-4 space-y-2 max-h-40 overflow-y-auto">
+            <p className="text-body-small font-semibold text-[#fca5a5]">Detail Error:</p>
             {rows.filter(r => r.errors.length > 0).map(row => (
-              <div key={row.rowNum} className="text-xs text-on-surface-variant">
-                <span className="font-mono text-[#f87171]">Baris {row.rowNum}:</span>{' '}
+              <div key={row.rowNum} className="text-xs text-[#bfc8c4]">
+                <span className="font-mono text-[#fca5a5]">Baris {row.rowNum}:</span>{' '}
                 {row.errors.join(' • ')}
               </div>
             ))}
@@ -573,15 +573,15 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
 
         {/* ── Hasil Upload ─────────────────────────────────────────────────── */}
         {results && (
-          <div className="rounded-xl bg-surface-container p-6 text-center space-y-3">
-            <span className="material-symbols-outlined text-5xl text-primary block">task_alt</span>
-            <p className="text-title-medium font-semibold text-on-surface">Upload Selesai</p>
+          <div className="rounded-xl bg-[#1e2430] border border-[#2a303c] p-6 text-center space-y-3">
+            <span className="material-symbols-outlined text-5xl text-[#86efac] block">task_alt</span>
+            <p className="text-title-medium font-semibold text-[#e8eaf0]">Upload Selesai</p>
             <div className="flex justify-center gap-6 text-body-medium">
-              <span className="text-[#4ade80]">
+              <span className="text-[#86efac]">
                 <span className="font-bold text-lg">{results.success}</span> berhasil
               </span>
               {results.failed > 0 && (
-                <span className="text-[#f87171]">
+                <span className="text-[#fca5a5]">
                   <span className="font-bold text-lg">{results.failed}</span> gagal
                 </span>
               )}
@@ -591,20 +591,20 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
 
         {/* ── Panduan Kolom ────────────────────────────────────────────────── */}
         {!hasRows && (
-          <details className="text-xs text-on-surface-variant">
-            <summary className="cursor-pointer font-medium text-on-surface hover:text-primary transition-colors">
+          <details className="text-xs text-[#bfc8c4]">
+            <summary className="cursor-pointer font-medium text-[#e8eaf0] hover:text-[#86efac] transition-colors">
               Panduan Format Kolom
             </summary>
-            <div className="mt-3 rounded-xl border border-outline-variant overflow-hidden">
+            <div className="mt-3 rounded-xl border border-white/20 overflow-hidden">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-surface-container-high">
-                    <th className="px-3 py-2 text-left font-medium">Nama Kolom</th>
-                    <th className="px-3 py-2 text-left font-medium">Wajib</th>
-                    <th className="px-3 py-2 text-left font-medium">Format / Nilai</th>
+                  <tr className="bg-white/5 border-b border-white/20">
+                    <th className="px-3 py-2 text-left font-medium text-[#e8eaf0]">Nama Kolom</th>
+                    <th className="px-3 py-2 text-left font-medium text-[#e8eaf0]">Wajib</th>
+                    <th className="px-3 py-2 text-left font-medium text-[#e8eaf0]">Format / Nilai</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-outline-variant/30">
+                <tbody className="divide-y divide-white/10">
                   {[
                     ['tanggal',          'Ya',  'YYYY-MM-DD, DD/MM/YYYY, atau DD/MM/YY'],
                     ['no_bukti',         'Tidak','Diisi otomatis jika kosong'],
@@ -617,9 +617,9 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
                     ...(!lockedUnitId ? [['unit_kerja','Tidak', workUnits.length ? workUnits.map(u => u.name).join(', ') : 'Nama unit kerja']] : []),
                   ].map(([col, wajib, fmt]) => (
                     <tr key={col}>
-                      <td className="px-3 py-2 font-mono text-primary">{col}</td>
-                      <td className="px-3 py-2">{wajib}</td>
-                      <td className="px-3 py-2 text-on-surface-variant">{fmt}</td>
+                      <td className="px-3 py-2 font-mono text-[#86efac]">{col}</td>
+                      <td className="px-3 py-2 text-[#e8eaf0]">{wajib}</td>
+                      <td className="px-3 py-2 text-[#bfc8c4]">{fmt}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -629,11 +629,12 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
         )}
 
         {/* ── Tombol Aksi ──────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex items-center justify-between gap-3 pt-4 border-t border-white/10">
           <Button
             variant="ghost"
             size="sm"
             icon="download"
+            className="!text-[#86efac] hover:!bg-white/5"
             onClick={downloadTemplate}
           >
             Unduh Template
@@ -646,7 +647,7 @@ export function BulkUploadModal({ open, onClose, txType, onSuccess }: UploadModa
               </Button>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={handleClose}>
+                <Button variant="ghost" size="sm" className="!text-[#bfc8c4] hover:!bg-white/5" onClick={handleClose}>
                   Batal
                 </Button>
                 {!hasRows ? (

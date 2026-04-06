@@ -4,6 +4,10 @@ import type { DbTransaction } from '../types/database'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
 
+// ── In-Memory Cache Sederhana ──
+const transactionCache = new Map<string, { timestamp: number, tx: Transaction[], masuk: number, keluar: number }>()
+const CACHE_TTL = 1000 * 60 * 2 // Cache valid selama 2 menit
+
 interface FilterOptions {
   type?:    TransactionType
   status?:  TransactionStatus
@@ -28,7 +32,24 @@ export function useTransactions(filter: FilterOptions = {}) {
   const [totalPengeluaran,setTotalPengeluaran]= useState(0)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    // Generate cache key berdasarkan filter
+    const cacheKey = `${tahunAnggaran}-${filter.type || 'all'}-${filter.status || 'all'}-${filter.unitId || 'all'}`
+
+    if (force) {
+      transactionCache.clear() // Hapus semua cache jika ada update data massal (mis. submit/create/edit)
+    } else {
+      const cached = transactionCache.get(cacheKey)
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        // Gunakan cache
+        setTransactions(cached.tx)
+        setTotalPenerimaan(cached.masuk)
+        setTotalPengeluaran(cached.keluar)
+        setLoading(false)
+        return
+      }
+    }
+
     setLoading(true)
 
     let q = supabase
@@ -85,6 +106,9 @@ export function useTransactions(filter: FilterOptions = {}) {
       if (row.type === 'IN')  masuk  += Number(row.amount)
       if (row.type === 'OUT') keluar += Number(row.amount)
     }
+    // Simpan ke cache
+    transactionCache.set(cacheKey, { timestamp: Date.now(), tx: mapped, masuk, keluar })
+
     setTotalPenerimaan(masuk)
     setTotalPengeluaran(keluar)
     setLoading(false)
@@ -92,5 +116,5 @@ export function useTransactions(filter: FilterOptions = {}) {
 
   useEffect(() => { load() }, [load])
 
-  return { transactions, totalPenerimaan, totalPengeluaran, loading, refetch: load }
+  return { transactions, totalPenerimaan, totalPengeluaran, loading, refetch: () => load(true) }
 }

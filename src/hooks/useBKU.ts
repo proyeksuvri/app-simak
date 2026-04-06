@@ -54,6 +54,8 @@ export function useBKU(type: BKUType, unitId?: string) {
         bkuType:    type,
         unitId:     r.work_unit_id,
         saldo,
+        status:     r.status,
+        kategori:   r.kode_rekening,
       }
     })
 

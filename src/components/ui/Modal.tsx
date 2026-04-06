@@ -42,17 +42,18 @@ export function Modal({ open, onClose, title, children, maxWidth = 'md' }: Modal
       {/* Panel */}
       <div
         className={[
-          'relative w-full bg-surface-container-lowest rounded-2xl shadow-xl flex flex-col',
-          'max-h-[90vh] overflow-hidden',
+          'relative w-full rounded-2xl shadow-xl flex flex-col',
+          'max-h-[90vh] overflow-hidden border border-white/5',
           maxWidthMap[maxWidth],
         ].join(' ')}
+        style={{ background: '#121620' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
-          <h2 className="text-title-medium font-semibold text-on-surface">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <h2 className="text-title-medium font-semibold text-[#e8eaf0]">{title}</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+            className="p-1 rounded-full text-white/50 hover:bg-white/10 transition-colors"
             aria-label="Tutup"
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1.25rem' }}>close</span>

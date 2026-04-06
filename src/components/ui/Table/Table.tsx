@@ -29,7 +29,7 @@ export function TableHeadCell({
   return (
     <th
       className={['px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-widest font-body', alignClass].join(' ')}
-      style={{ color: 'rgba(232,234,240,0.4)' }}
+      style={{ color: 'rgba(232,234,240,0.7)' }}
     >
       {children}
     </th>
@@ -43,15 +43,18 @@ export function TableBody({ children }: { children: ReactNode }) {
 export function TableRow({
   children,
   even = false,
+  style,
 }: {
   children: ReactNode
   even?: boolean
+  style?: React.CSSProperties
 }) {
   return (
     <tr
       style={{
         borderBottom: '1px solid rgba(255,255,255,0.04)',
         background: even ? 'rgba(255,255,255,0.02)' : 'transparent',
+        ...style,
       }}
     >
       {children}

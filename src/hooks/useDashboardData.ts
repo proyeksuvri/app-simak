@@ -183,11 +183,11 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
         const byDay: Record<string, { penerimaan: number; pengeluaran: number }> = {}
         for (let i = 0; i <= dayDiff; i++) {
           const d = new Date(filterFrom)
-          d.setDate(d.getDate() + i)
+          d.setUTCDate(d.getUTCDate() + i)
           const iso = d.toISOString().split('T')[0]!
           if (iso > filterTo) break
-          const dd  = String(d.getDate()).padStart(2, '0')
-          const mon = MONTHS_SHORT[d.getMonth()]!
+          const dd  = String(d.getUTCDate()).padStart(2, '0')
+          const mon = MONTHS_SHORT[d.getUTCMonth()]!
           byDay[iso] = { penerimaan: 0, pengeluaran: 0 }
           ;(byDay[iso] as any).__label = `${dd} ${mon}`
         }

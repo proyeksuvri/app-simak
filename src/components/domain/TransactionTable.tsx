@@ -406,13 +406,14 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
         <div className="mb-4 flex flex-wrap gap-2 items-end">
           {/* Search */}
           <div className="relative flex-1 min-w-[180px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" style={{ fontSize: '1rem' }}>search</span>
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ fontSize: '1rem', color: 'rgba(232,234,240,0.4)' }}>search</span>
             <input
               type="text"
               placeholder="Cari deskripsi / no. bukti…"
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
             />
           </div>
 
@@ -420,32 +421,35 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
           <select
             value={filterStatusLocal}
             onChange={e => setFilterStatusLocal(e.target.value as Transaction['status'] | '')}
-            className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
           >
             {STATUS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
+              <option key={o.value} value={o.value} style={{ background: '#1e2430', color: '#e8eaf0' }}>{o.label}</option>
             ))}
           </select>
 
           {/* Tanggal dari */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-on-surface-variant whitespace-nowrap">Dari</span>
+            <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>Dari</span>
             <input
               type="date"
               value={dateFrom}
               onChange={e => setDateFrom(e.target.value)}
-              className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
             />
           </div>
 
           {/* Tanggal sampai */}
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-on-surface-variant whitespace-nowrap">s/d</span>
+            <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>s/d</span>
             <input
               type="date"
               value={dateTo}
               onChange={e => setDateTo(e.target.value)}
-              className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
             />
           </div>
 
@@ -488,7 +492,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
         {/* Bulk action bar */}
         {showCheckboxes && (
           <div className="mb-3 flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.5)' }}>
+            <span className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.8)' }}>
               {someSelected ? `${selected.size} transaksi dipilih` : `${selectableIds.length} transaksi dapat dipilih`}
             </span>
             {someSelected && isBendahara && submitableSelected.length > 0 && (
@@ -605,15 +609,15 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
         {/* Modal hapus */}
         <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="Hapus Transaksi">
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
               Yakin ingin menghapus transaksi{' '}
               <span className="font-semibold" style={{ color: '#e8eaf0' }}>{deleteTarget?.nomorBukti}</span>?{' '}
               Tindakan ini tidak dapat diurungkan.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>Batal</Button>
-              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={deleting} onClick={handleDeleteConfirm}>
+              <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)} className="!bg-[#2a303c] !text-[#bfc8c4] hover:!bg-[#3b4252] border border-white/10">Batal</Button>
+              <Button variant="primary" size="sm" className="!bg-[#fca5a5]/10 !text-[#fca5a5] hover:!bg-[#fca5a5]/20 border border-[#fca5a5]/30" disabled={deleting} onClick={handleDeleteConfirm}>
                 {deleting ? 'Menghapus...' : 'Hapus'}
               </Button>
             </div>
@@ -622,15 +626,15 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
         {/* Modal hapus massal */}
         <Modal open={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)} title="Hapus Transaksi Massal">
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
               Yakin ingin menghapus{' '}
               <span className="font-semibold" style={{ color: '#f87171' }}>{selected.size} transaksi</span>{' '}
               yang dipilih? Tindakan ini tidak dapat diurungkan.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)}>Batal</Button>
-              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={bulkDeleting} onClick={handleBulkDelete}>
+              <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)} className="!bg-[#2a303c] !text-[#bfc8c4] hover:!bg-[#3b4252] border border-white/10">Batal</Button>
+              <Button variant="primary" size="sm" className="!bg-[#fca5a5]/10 !text-[#fca5a5] hover:!bg-[#fca5a5]/20 border border-[#fca5a5]/30" disabled={bulkDeleting} onClick={handleBulkDelete}>
                 {bulkDeleting ? 'Menghapus...' : `Hapus ${selected.size} Transaksi`}
               </Button>
             </div>
@@ -639,15 +643,15 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
         {/* Modal setujui massal */}
         <Modal open={bulkApproveOpen} onClose={() => setBulkApproveOpen(false)} title="Setujui Transaksi Massal">
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
               Yakin ingin menyetujui{' '}
               <span className="font-semibold" style={{ color: '#4ade80' }}>{approvableSelected.length} transaksi</span>{' '}
               yang dipilih?
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setBulkApproveOpen(false)}>Batal</Button>
-              <Button variant="primary" size="sm" icon="check_circle" disabled={bulkApproving} onClick={handleBulkApprove}>
+              <Button variant="secondary" size="sm" onClick={() => setBulkApproveOpen(false)} className="!bg-[#2a303c] !text-[#bfc8c4] hover:!bg-[#3b4252] border border-white/10">Batal</Button>
+              <Button variant="primary" size="sm" icon="check_circle" disabled={bulkApproving} className="!bg-[#86efac]/10 !text-[#86efac] hover:!bg-[#86efac]/20 border border-[#86efac]/30" onClick={handleBulkApprove}>
                 {bulkApproving ? 'Memproses...' : `Setujui ${approvableSelected.length} Transaksi`}
               </Button>
             </div>
@@ -656,7 +660,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
         {/* Modal tolak massal */}
         <Modal open={bulkRejectOpen} onClose={() => setBulkRejectOpen(false)} title="Tolak Transaksi Massal">
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
               Tolak{' '}
               <span className="font-semibold" style={{ color: '#f87171' }}>{approvableSelected.length} transaksi</span>{' '}
@@ -671,8 +675,8 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
               onChange={e => setBulkRejectNote(e.target.value)}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setBulkRejectOpen(false)}>Batal</Button>
-              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={bulkRejecting} onClick={handleBulkReject}>
+              <Button variant="secondary" size="sm" onClick={() => setBulkRejectOpen(false)} className="!bg-[#2a303c] !text-[#bfc8c4] hover:!bg-[#3b4252] border border-white/10">Batal</Button>
+              <Button variant="primary" size="sm" disabled={bulkRejecting} className="!bg-[#fca5a5]/10 !text-[#fca5a5] hover:!bg-[#fca5a5]/20 border border-[#fca5a5]/30" onClick={handleBulkReject}>
                 {bulkRejecting ? 'Memproses...' : `Tolak ${approvableSelected.length} Transaksi`}
               </Button>
             </div>
@@ -681,7 +685,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
         {/* Modal tolak */}
         <Modal open={rejectTarget !== null} onClose={() => setRejectTarget(null)} title="Tolak Transaksi">
-          <div className="space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
               Berikan catatan penolakan (opsional):
             </p>
@@ -694,11 +698,11 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
               onChange={e => setRejectNote(e.target.value)}
             />
             {actionError && (
-              <p className="text-sm font-body" style={{ color: '#f87171' }}>{actionError}</p>
+              <p className="text-sm font-body" style={{ color: '#fca5a5' }}>{actionError}</p>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setRejectTarget(null)}>Batal</Button>
-              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={approval.rejecting} onClick={handleRejectConfirm}>
+              <Button variant="secondary" size="sm" onClick={() => setRejectTarget(null)} className="!bg-[#2a303c] !text-[#bfc8c4] hover:!bg-[#3b4252] border border-white/10">Batal</Button>
+              <Button variant="primary" size="sm" className="!bg-[#fca5a5]/10 !text-[#fca5a5] hover:!bg-[#fca5a5]/20 border border-[#fca5a5]/30" disabled={approval.rejecting} onClick={handleRejectConfirm}>
                 {approval.rejecting ? 'Memproses...' : 'Tolak'}
               </Button>
             </div>
@@ -731,8 +735,8 @@ function SummaryCard({ label, value, icon, color, warning }: {
     >
       <span className="material-symbols-outlined text-2xl" style={{ color, flexShrink: 0 }}>{icon}</span>
       <div className="min-w-0">
-        <p className="text-xs text-on-surface-variant truncate">{label}</p>
-        <p className="text-sm font-semibold truncate" style={{ color }}>{value}</p>
+        <p className="text-xs truncate font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>{label}</p>
+        <p className="text-sm font-semibold truncate font-body" style={{ color }}>{value}</p>
       </div>
     </div>
   )
@@ -768,23 +772,23 @@ function Pagination({ page, totalPages, pageSize, totalRows, startIndex, endInde
 
   const btnBase     = 'inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg text-xs font-medium transition-colors select-none'
   const btnActive   = 'bg-primary text-on-primary'
-  const btnInactive = 'text-on-surface-variant hover:bg-surface-container-high'
+  const btnInactive = 'text-[#e8eaf0]/70 hover:bg-white/10 hover:text-[#e8eaf0]'
   const btnDisabled = 'opacity-30 cursor-not-allowed'
 
   return (
     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3 text-xs text-on-surface-variant">
+      <div className="flex items-center gap-3 text-xs" style={{ color: 'rgba(232,234,240,0.7)' }}>
         <span>{totalRows === 0 ? '0 data' : `${startIndex}–${endIndex} dari ${totalRows} transaksi`}</span>
-        <span className="text-outline-variant">|</span>
+        <span style={{ color: 'rgba(232,234,240,0.3)' }}>|</span>
         <label className="flex items-center gap-1.5">
           Baris:
           <select
             value={pageSize}
             onChange={e => onPageSize(Number(e.target.value))}
-            className="h-7 px-2 rounded-lg text-xs text-on-surface focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+            className="h-7 px-2 rounded-lg text-xs focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.2)', color: '#e8eaf0' }}
           >
-            {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s} style={{ background: '#1e2430', color: '#e8eaf0' }}>{s}</option>)}
           </select>
         </label>
       </div>
@@ -859,7 +863,7 @@ function TransactionRow({
         </TableCell>
       )}
       <TableCell>
-        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.45)' }}>{formatTanggal(t.tanggal)}</span>
+        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.85)' }}>{formatTanggal(t.tanggal)}</span>
       </TableCell>
       <TableCell>
         <span className="text-xs font-medium font-body" style={{ color: '#9B6DFF' }}>{t.nomorBukti}</span>
@@ -873,7 +877,7 @@ function TransactionRow({
         </div>
       </TableCell>
       <TableCell>
-        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.45)' }}>{t.kategori}</span>
+        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.85)' }}>{t.kategori}</span>
       </TableCell>
 
       {/* Kolom rekening bank — hanya BPN */}
@@ -886,8 +890,8 @@ function TransactionRow({
             </span>
           ) : account ? (
             <div>
-              <span className="text-xs font-medium" style={{ color: 'rgba(232,234,240,0.8)' }}>{account.bank_name}</span>
-              <p className="text-xs font-mono" style={{ color: 'rgba(232,234,240,0.4)' }}>{account.account_number}</p>
+              <span className="text-xs font-medium" style={{ color: 'rgba(232,234,240,0.9)' }}>{account.bank_name}</span>
+              <p className="text-xs font-mono" style={{ color: 'rgba(232,234,240,0.6)' }}>{account.account_number}</p>
             </div>
           ) : (
             <span className="text-xs" style={{ color: 'rgba(232,234,240,0.3)' }}>—</span>
@@ -911,22 +915,22 @@ function TransactionRow({
           <div className="flex items-center justify-center gap-1.5 flex-wrap">
             {isBendahara && t.status === 'pending' && (
               <>
-                <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(t)}>
+                <Button variant="ghost" size="sm" icon="edit" className="!text-[#86efac] hover:bg-[#86efac]/10" onClick={() => onEdit(t)}>
                   Edit
                 </Button>
-                <Button variant="ghost" size="sm" icon="send" disabled={submitting} onClick={() => onSubmit(t.id)}>
+                <Button variant="ghost" size="sm" icon="send" disabled={submitting} className="!text-[#86efac] hover:bg-[#86efac]/10" onClick={() => onSubmit(t.id)}>
                   Ajukan
                 </Button>
               </>
             )}
             {isBendahara && t.status === 'ditolak' && (
-              <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(t)}>
+              <Button variant="ghost" size="sm" icon="edit" className="!text-[#86efac] hover:bg-[#86efac]/10" onClick={() => onEdit(t)}>
                 Edit
               </Button>
             )}
             {((isBendahara && (t.status === 'pending' || t.status === 'ditolak')) ||
               (role === 'admin' && t.status !== 'diajukan')) && (
-              <Button variant="ghost" size="sm" icon="delete" className="!text-[#f87171]" onClick={() => onDelete(t)}>
+              <Button variant="ghost" size="sm" icon="delete" className="!text-[#fca5a5] hover:bg-[#fca5a5]/10" onClick={() => onDelete(t)}>
                 Hapus
               </Button>
             )}

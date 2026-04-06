@@ -177,7 +177,7 @@ export function TransactionFormModal({
 
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidth="md">
-      <form onSubmit={handleSubmit} noValidate>
+      <form onSubmit={handleSubmit} noValidate style={{ colorScheme: 'dark' }}>
         <div className="px-6 py-5 space-y-4">
 
           {/* Row: Tanggal + Nomor Bukti */}
@@ -230,7 +230,7 @@ export function TransactionFormModal({
 
             <Field label="Nominal (Rp)" error={fieldErrors.amountFormatted} required>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm select-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#bfc8c4] text-sm select-none">
                   Rp
                 </span>
                 <input
@@ -257,10 +257,10 @@ export function TransactionFormModal({
                   className={[
                     inputCls(false),
                     'cursor-not-allowed opacity-60 select-none',
-                    mekanismeBisnis ? 'text-on-surface font-medium' : 'text-on-surface-variant italic',
+                    mekanismeBisnis ? 'text-[#e8eaf0] font-medium' : 'text-[#bfc8c4] italic',
                   ].join(' ')}
                 />
-                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/50 pointer-events-none"
+                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[16px] text-white/30 pointer-events-none"
                   style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
                   lock
                 </span>
@@ -344,9 +344,9 @@ export function TransactionFormModal({
 
           {/* Periode aktif (read-only info) */}
           {activePeriod && (
-            <div className="text-xs text-on-surface-variant bg-surface-container rounded-lg px-3 py-2">
+            <div className="text-xs text-[#bfc8c4] bg-[#1e2430] border border-[#2a303c] rounded-lg px-3 py-2">
               Periode aktif:{' '}
-              <span className="font-semibold text-on-surface">
+              <span className="font-semibold text-[#e8eaf0]">
                 {activePeriod.code ?? `${activePeriod.month}/${activePeriod.year}`}
               </span>
             </div>
@@ -361,7 +361,7 @@ export function TransactionFormModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10">
           <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={saving}>
             Batal
           </Button>
@@ -391,23 +391,23 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-on-surface-variant">
+      <label className="text-xs font-medium text-[#bfc8c4]">
         {label}
         {required && <span className="text-error ml-0.5">*</span>}
       </label>
       {children}
       {error && <span className="text-xs text-error">{error}</span>}
-      {!error && hint && <span className="text-xs text-on-surface-variant/70">{hint}</span>}
+      {!error && hint && <span className="text-xs text-[#bfc8c4]/70">{hint}</span>}
     </div>
   )
 }
 
 function inputCls(hasError: boolean) {
   return [
-    'w-full px-3 py-2 rounded-xl text-sm bg-surface-container',
-    'border border-outline-variant text-on-surface',
-    'focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary',
-    'transition-colors placeholder:text-on-surface-variant/50',
-    hasError ? 'border-error focus:ring-error/30 focus:border-error' : '',
+    'w-full px-3 py-2 rounded-xl text-sm bg-[#1e2430]',
+    'border text-[#e8eaf0]',
+    hasError ? 'border-error focus:ring-error/30 focus:border-error' : 'border-[#2a303c] focus:border-primary',
+    'focus:outline-none focus:ring-2 focus:ring-primary/40',
+    'transition-colors placeholder:text-white/30',
   ].join(' ')
 }

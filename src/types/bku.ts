@@ -1,3 +1,5 @@
+import type { TransactionStatus } from './database'
+
 export type BKUType = 'penerimaan' | 'induk' | 'pembantu'
 
 export interface BKUEntry {
@@ -9,7 +11,10 @@ export interface BKUEntry {
   kredit:      number   // kas keluar (BPK) — 0 jika penerimaan
   bkuType:     BKUType
   unitId:      string | null
+  status?:     TransactionStatus | null  // status transaksi dari DB
+  kategori?:   string | null
 }
+
 
 // BKUEntry dengan saldo berjalan yang sudah dihitung
 export interface BKUEntryWithSaldo extends BKUEntry {
