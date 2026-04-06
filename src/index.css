@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #f7f9fb;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    line-height: 1;
+    user-select: none;
+  }
+}
+
+/* ─── CSS Custom Properties ─────────────────────────────────── */
+:root {
+  /*
+   * Islamic geometric pattern — 8-pointed star (khatam) tiled at 60×60px.
+   * Inline SVG data URI, no external asset needed.
+   * Stroke: #004f45 (primary) at opacity 0.35 inside SVG.
+   * The container div adds opacity-[0.04] for the final ~1.4% visual weight —
+   * present on close inspection, invisible at a glance.
+   */
+  --pattern-islamic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='none' stroke='%23004f45' stroke-width='0.8' opacity='0.35'%3E%3Crect x='15' y='15' width='30' height='30' transform='rotate(45 30 30)'/%3E%3Crect x='18' y='18' width='24' height='24'/%3E%3Cline x1='30' y1='5' x2='30' y2='55'/%3E%3Cline x1='5' y1='30' x2='55' y2='30'/%3E%3Cline x1='9' y1='9' x2='51' y2='51'/%3E%3Cline x1='51' y1='9' x2='9' y2='51'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ─── Utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  /* Font family — Plus Jakarta Sans replaces Inter */
+  .font-data {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .font-body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  .font-headline {
+    font-family: 'Public Sans', system-ui, sans-serif;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+  .tracking-financial {
+    letter-spacing: 0.02em;
+  }
+  .tracking-label {
+    letter-spacing: 0.05em;
+  }
+}

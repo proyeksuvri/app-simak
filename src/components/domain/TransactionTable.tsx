@@ -1,0 +1,948 @@
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import type { Transaction, TransactionType, UserRole } from '../../types'
+import type { DbBankAccount } from '../../types/database'
+import {
+  Table, TableHead, TableHeadCell, TableBody, TableRow, TableCell,
+} from '../ui/Table/Table'
+import { StatusBadge } from '../ui/Badge'
+import { EmptyState } from '../ui/EmptyState'
+import { Button } from '../ui/Button'
+import { Modal } from '../ui/Modal'
+import { formatRupiah, formatTanggal } from '../../lib/formatters'
+import { useTransactions } from '../../hooks/useTransactions'
+import { useApproval } from '../../hooks/useApproval'
+import { useMutateTransaction } from '../../hooks/useMutateTransaction'
+import { useAppContext } from '../../context/AppContext'
+import { useBankAccounts } from '../../hooks/useBankAccounts'
+import { TransactionFormModal } from './TransactionFormModal'
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+const STATUS_OPTIONS: { label: string; value: Transaction['status'] | '' }[] = [
+  { label: 'Semua Status', value: '' },
+  { label: 'Draft',        value: 'pending' },
+  { label: 'Diajukan',     value: 'diajukan' },
+  { label: 'Terverifikasi',value: 'terverifikasi' },
+  { label: 'Ditolak',      value: 'ditolak' },
+]
+
+interface TransactionTableProps {
+  filterType?:     TransactionType
+  filterStatus?:   Transaction['status']
+  filterUnitId?:   string
+  filterKategori?: string
+  limit?:          number
+  onMutated?:      () => void
+}
+
+const BENDAHARA_ROLES: UserRole[] = [
+  'bendahara_penerimaan', 'bendahara_induk', 'bendahara_pembantu',
+]
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+interface ToastProps {
+  message: string
+  type: 'success' | 'error'
+  onDone: () => void
+}
+
+function Toast({ message, type, onDone }: ToastProps) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000)
+    return () => clearTimeout(t)
+  }, [onDone])
+
+  return (
+    <div
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-sm font-medium animate-fade-in"
+      style={{
+        background: type === 'success' ? 'rgba(74,222,128,0.15)' : 'rgba(248,113,113,0.15)',
+        border: `1px solid ${type === 'success' ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)'}`,
+        color: type === 'success' ? '#4ade80' : '#f87171',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>
+        {type === 'success' ? 'check_circle' : 'error'}
+      </span>
+      {message}
+    </div>
+  )
+}
+
+// ─── Komponen Utama ───────────────────────────────────────────────────────────
+
+export function TransactionTable({ filterType, filterStatus, filterUnitId, filterKategori, limit, onMutated }: TransactionTableProps) {
+  const { currentUser } = useAppContext()
+  const { transactions, refetch } = useTransactions({ type: filterType, status: filterStatus, unitId: filterUnitId })
+  const approval = useApproval()
+  const { accounts } = useBankAccounts(false)
+
+  const { deleteTransaction, saving: deleting } = useMutateTransaction()
+
+  const [rejectTarget,   setRejectTarget]   = useState<string | null>(null)
+  const [rejectNote,     setRejectNote]     = useState('')
+  const [actionError,    setActionError]    = useState<string | null>(null)
+  const [editTarget,     setEditTarget]     = useState<Transaction | null>(null)
+  const [deleteTarget,   setDeleteTarget]   = useState<Transaction | null>(null)
+  const [selected,         setSelected]         = useState<Set<string>>(new Set())
+  const [bulkSubmitting,   setBulkSubmitting]   = useState(false)
+  const [bulkDeleting,     setBulkDeleting]     = useState(false)
+  const [bulkDeleteOpen,   setBulkDeleteOpen]   = useState(false)
+  const [bulkApproving,    setBulkApproving]    = useState(false)
+  const [bulkApproveOpen,  setBulkApproveOpen]  = useState(false)
+  const [bulkRejecting,    setBulkRejecting]    = useState(false)
+  const [bulkRejectOpen,   setBulkRejectOpen]   = useState(false)
+  const [bulkRejectNote,   setBulkRejectNote]   = useState('')
+
+  // ── Toast ────────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+  }, [])
+
+  // ── Filter lokal ────────────────────────────────────────────────────────────
+  const [searchText,        setSearchText]        = useState('')
+  const [filterStatusLocal, setFilterStatusLocal] = useState<Transaction['status'] | ''>('')
+  const [dateFrom,          setDateFrom]          = useState('')
+  const [dateTo,            setDateTo]            = useState('')
+
+  // ── Paginasi ────────────────────────────────────────────────────────────────
+  const [page,     setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
+
+  const filtered = useMemo(() => {
+    let result = filterKategori ? transactions.filter(t => t.kategori === filterKategori) : transactions
+
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase()
+      result = result.filter(t =>
+        t.deskripsi.toLowerCase().includes(q) ||
+        t.nomorBukti.toLowerCase().includes(q)
+      )
+    }
+
+    if (filterStatusLocal) {
+      result = result.filter(t => t.status === filterStatusLocal)
+    }
+
+    if (dateFrom) result = result.filter(t => t.tanggal >= dateFrom)
+    if (dateTo)   result = result.filter(t => t.tanggal <= dateTo)
+
+    return result
+  }, [transactions, filterKategori, searchText, filterStatusLocal, dateFrom, dateTo])
+
+  // ── Summary stats (dari semua transaksi, bukan filtered) ───────────────────
+  const stats = useMemo(() => {
+    const base = filterKategori ? transactions.filter(t => t.kategori === filterKategori) : transactions
+    return {
+      totalNominal:   base.filter(t => t.status === 'terverifikasi').reduce((s, t) => s + t.nominal, 0),
+      countDraft:     base.filter(t => t.status === 'pending').length,
+      countDiajukan:  base.filter(t => t.status === 'diajukan').length,
+      countVerified:  base.filter(t => t.status === 'terverifikasi').length,
+      missingAccount: base.filter(t => t.type === 'penerimaan' && !t.destinationAccountId).length,
+    }
+  }, [transactions, filterKategori])
+
+  // Jika prop limit dipakai (mode ringkasan), tidak pakai paginasi
+  const usePagination = !limit
+  const totalRows  = filtered.length
+  const totalPages = usePagination ? Math.max(1, Math.ceil(totalRows / pageSize)) : 1
+
+  // Reset ke halaman 1 jika filter berubah
+  useEffect(() => {
+    setPage(1)
+  }, [filterType, filterStatus, filterUnitId, filterKategori, pageSize, searchText, filterStatusLocal, dateFrom, dateTo])
+
+  const rows = useMemo(() => {
+    if (!usePagination) return filtered.slice(0, limit)
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page, pageSize, usePagination, limit])
+
+  const startIndex = usePagination ? (page - 1) * pageSize + 1 : 1
+  const endIndex   = usePagination ? Math.min(page * pageSize, totalRows) : rows.length
+
+  const role        = currentUser.role
+  const isBendahara = BENDAHARA_ROLES.includes(role)
+  const canApprove  = role === 'pimpinan' || role === 'admin'
+  const showActions = isBendahara || canApprove
+  const isPenerimaan = filterType === 'penerimaan'
+
+  // Rows eligible for selection
+  const selectableIds = isBendahara
+    ? filtered.filter(t => t.status === 'pending' || t.status === 'ditolak').map(t => t.id)
+    : canApprove
+      ? filtered.filter(t => t.status === 'diajukan').map(t => t.id)
+      : []
+
+  const submitableSelected = isBendahara
+    ? [...selected].filter(id => filtered.find(t => t.id === id)?.status === 'pending')
+    : []
+
+  const approvableSelected = canApprove
+    ? [...selected].filter(id => filtered.find(t => t.id === id)?.status === 'diajukan')
+    : []
+
+  const allSelected    = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
+  const someSelected   = selected.size > 0
+  const showCheckboxes = selectableIds.length > 0
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(prev => { const next = new Set(prev); selectableIds.forEach(id => next.delete(id)); return next })
+    } else {
+      setSelected(prev => new Set([...prev, ...selectableIds]))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  // ── Action handlers ──────────────────────────────────────────────────────────
+
+  const handleBulkSubmit = async () => {
+    const missingAccount = submitableSelected.filter(id => {
+      const tx = filtered.find(t => t.id === id)
+      return tx?.type === 'penerimaan' && !tx.destinationAccountId
+    })
+    if (missingAccount.length > 0) {
+      setActionError(`${missingAccount.length} transaksi BPN belum memiliki rekening bank. Edit transaksi tersebut terlebih dahulu.`)
+      return
+    }
+    setBulkSubmitting(true)
+    setActionError(null)
+    const { submitted, skipped, error } = await approval.submitBulk(submitableSelected)
+    setBulkSubmitting(false)
+    setSelected(new Set())
+    if (error) {
+      setActionError(error)
+    } else {
+      if (skipped > 0) setActionError(`${skipped} transaksi dilewati (bukan status Draft)`)
+      if (submitted > 0) showToast(`${submitted} transaksi berhasil diajukan`)
+    }
+    refetch()
+    onMutated?.()
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    setActionError(null)
+    const ids = [...selected]
+    let firstErr: string | null = null
+    let successCount = 0
+    for (const id of ids) {
+      const ok = await deleteTransaction(id)
+      if (ok) successCount++; else if (!firstErr) firstErr = 'Gagal menghapus sebagian transaksi'
+    }
+    setBulkDeleting(false)
+    setBulkDeleteOpen(false)
+    setSelected(new Set())
+    if (firstErr) setActionError(firstErr)
+    else showToast(`${successCount} transaksi berhasil dihapus`)
+    refetch()
+    onMutated?.()
+  }
+
+  const handleBulkApprove = async () => {
+    setBulkApproving(true)
+    setActionError(null)
+    const { approved, skipped, error } = await approval.approveBulk(approvableSelected)
+    setBulkApproving(false)
+    setBulkApproveOpen(false)
+    setSelected(new Set())
+    if (error) {
+      setActionError(error)
+    } else {
+      if (skipped > 0) setActionError(`${skipped} transaksi dilewati (bukan status Diajukan)`)
+      if (approved > 0) showToast(`${approved} transaksi berhasil disetujui`)
+    }
+    refetch()
+    onMutated?.()
+  }
+
+  const handleBulkReject = async () => {
+    setBulkRejecting(true)
+    setActionError(null)
+    const { rejected, skipped, error } = await approval.rejectBulk(approvableSelected, bulkRejectNote)
+    setBulkRejecting(false)
+    setBulkRejectOpen(false)
+    setBulkRejectNote('')
+    setSelected(new Set())
+    if (error) {
+      setActionError(error)
+    } else {
+      if (skipped > 0) setActionError(`${skipped} transaksi dilewati (bukan status Diajukan)`)
+      if (rejected > 0) showToast(`${rejected} transaksi berhasil ditolak`)
+    }
+    refetch()
+    onMutated?.()
+  }
+
+  const handleSubmit = async (txId: string) => {
+    setActionError(null)
+    const tx = filtered.find(t => t.id === txId)
+    if (tx?.type === 'penerimaan' && !tx.destinationAccountId) {
+      setActionError('Transaksi BPN ini belum memiliki rekening bank. Edit transaksi dan pilih rekening bank terlebih dahulu.')
+      return
+    }
+    const err = await approval.submit(txId)
+    if (err) { setActionError(err); return }
+    showToast('Transaksi berhasil diajukan')
+    refetch()
+    onMutated?.()
+  }
+
+  const handleApprove = async (txId: string) => {
+    setActionError(null)
+    const err = await approval.approve(txId)
+    if (err) { setActionError(err); return }
+    showToast('Transaksi berhasil disetujui')
+    refetch()
+    onMutated?.()
+  }
+
+  const openReject = (txId: string) => {
+    setRejectNote('')
+    setActionError(null)
+    setRejectTarget(txId)
+  }
+
+  const handleRejectConfirm = async () => {
+    if (!rejectTarget) return
+    setActionError(null)
+    const err = await approval.reject(rejectTarget, rejectNote)
+    if (err) { setActionError(err); return }
+    setRejectTarget(null)
+    showToast('Transaksi berhasil ditolak')
+    refetch()
+    onMutated?.()
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return
+    const ok = await deleteTransaction(deleteTarget.id)
+    if (ok) {
+      setDeleteTarget(null)
+      showToast('Transaksi berhasil dihapus')
+      refetch()
+      onMutated?.()
+    }
+  }
+
+  const handleEditSuccess = () => {
+    setEditTarget(null)
+    showToast('Transaksi berhasil disimpan')
+    refetch()
+    onMutated?.()
+  }
+
+  const hasActiveFilter = !!searchText || !!filterStatusLocal || !!dateFrom || !!dateTo
+
+  function resetFilters() {
+    setSearchText('')
+    setFilterStatusLocal('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  // ── Lookup nama rekening ─────────────────────────────────────────────────────
+  const accountMap = useMemo(() => {
+    const m: Record<string, DbBankAccount> = {}
+    accounts.forEach(a => { m[a.id] = a })
+    return m
+  }, [accounts])
+
+  return (
+    <>
+      {/* ── Summary Cards (hanya mode penuh, bukan limit) ─────────────────── */}
+      {!limit && (
+        <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <SummaryCard
+            label="Total Terverifikasi"
+            value={formatRupiah(stats.totalNominal)}
+            icon="verified"
+            color="#4ade80"
+          />
+          <SummaryCard
+            label="Draft"
+            value={`${stats.countDraft} transaksi`}
+            icon="edit_note"
+            color="rgba(232,234,240,0.5)"
+          />
+          <SummaryCard
+            label="Menunggu Persetujuan"
+            value={`${stats.countDiajukan} transaksi`}
+            icon="pending"
+            color="#facc15"
+          />
+          {isPenerimaan && stats.missingAccount > 0 ? (
+            <SummaryCard
+              label="Perlu Rekening Bank"
+              value={`${stats.missingAccount} transaksi`}
+              icon="warning"
+              color="#f87171"
+              warning
+            />
+          ) : (
+            <SummaryCard
+              label="Terverifikasi"
+              value={`${stats.countVerified} transaksi`}
+              icon="task_alt"
+              color="#4ade80"
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Filter Bar ─────────────────────────────────────────────────────── */}
+      {!limit && (
+        <div className="mb-4 flex flex-wrap gap-2 items-end">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px]">
+            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" style={{ fontSize: '1rem' }}>search</span>
+            <input
+              type="text"
+              placeholder="Cari deskripsi / no. bukti…"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Status */}
+          <select
+            value={filterStatusLocal}
+            onChange={e => setFilterStatusLocal(e.target.value as Transaction['status'] | '')}
+            className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+          >
+            {STATUS_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+
+          {/* Tanggal dari */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-on-surface-variant whitespace-nowrap">Dari</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Tanggal sampai */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-on-surface-variant whitespace-nowrap">s/d</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-3 py-1.5 rounded-xl text-sm bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+            />
+          </div>
+
+          {/* Reset */}
+          {hasActiveFilter && (
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-outline-variant transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '0.95rem' }}>filter_alt_off</span>
+              Reset
+            </button>
+          )}
+
+          {hasActiveFilter && (
+            <span className="text-xs text-on-surface-variant ml-1">
+              {filtered.length} dari {transactions.length} transaksi
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Empty state ────────────────────────────────────────────────────── */}
+      {filtered.length === 0 && (
+        <EmptyState
+          icon={hasActiveFilter ? 'search_off' : 'receipt_long'}
+          title={hasActiveFilter ? 'Tidak ada hasil' : 'Belum ada transaksi'}
+          message={hasActiveFilter ? 'Coba ubah kata kunci atau filter yang digunakan.' : 'Transaksi akan muncul di sini setelah diinput.'}
+        />
+      )}
+
+      {filtered.length > 0 && <>
+        {/* Error bar */}
+        {actionError && (
+          <div className="mb-3 px-4 py-2 rounded-xl text-sm font-body" style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}>
+            {actionError}
+          </div>
+        )}
+
+        {/* Bulk action bar */}
+        {showCheckboxes && (
+          <div className="mb-3 flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.5)' }}>
+              {someSelected ? `${selected.size} transaksi dipilih` : `${selectableIds.length} transaksi dapat dipilih`}
+            </span>
+            {someSelected && isBendahara && submitableSelected.length > 0 && (
+              <Button variant="primary" size="sm" icon="send" disabled={bulkSubmitting || bulkDeleting} onClick={handleBulkSubmit}>
+                {bulkSubmitting ? 'Mengajukan...' : `Ajukan ${submitableSelected.length} Transaksi`}
+              </Button>
+            )}
+            {someSelected && canApprove && approvableSelected.length > 0 && (
+              <Button
+                variant="primary" size="sm" icon="check_circle"
+                disabled={bulkApproving || bulkRejecting}
+                onClick={() => setBulkApproveOpen(true)}
+              >
+                {`Setujui ${approvableSelected.length} Transaksi`}
+              </Button>
+            )}
+            {someSelected && canApprove && approvableSelected.length > 0 && (
+              <Button
+                variant="secondary" size="sm" icon="cancel"
+                className="!text-[#f87171] border-[#f87171]/30 hover:bg-[#f87171]/10"
+                disabled={bulkApproving || bulkRejecting}
+                onClick={() => { setBulkRejectNote(''); setBulkRejectOpen(true) }}
+              >
+                {`Tolak ${approvableSelected.length} Transaksi`}
+              </Button>
+            )}
+            {someSelected && isBendahara && (
+              <Button
+                variant="secondary" size="sm" icon="delete"
+                className="!text-[#f87171] border-[#f87171]/30 hover:bg-[#f87171]/10"
+                disabled={bulkSubmitting || bulkDeleting}
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                {`Hapus ${selected.size} Transaksi`}
+              </Button>
+            )}
+          </div>
+        )}
+
+        <Table>
+          <TableHead>
+            {showCheckboxes && (
+              <TableHeadCell align="center">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary cursor-pointer"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  title="Pilih semua"
+                />
+              </TableHeadCell>
+            )}
+            <TableHeadCell>Tanggal</TableHeadCell>
+            <TableHeadCell>No. Bukti</TableHeadCell>
+            <TableHeadCell>Deskripsi</TableHeadCell>
+            <TableHeadCell>Kategori</TableHeadCell>
+            {isPenerimaan && <TableHeadCell>Rekening Bank</TableHeadCell>}
+            <TableHeadCell align="right">Nominal</TableHeadCell>
+            <TableHeadCell align="center">Status</TableHeadCell>
+            {showActions && <TableHeadCell align="center">Aksi</TableHeadCell>}
+          </TableHead>
+          <TableBody>
+            {rows.map((t, idx) => (
+              <TransactionRow
+                key={t.id}
+                transaction={t}
+                even={idx % 2 === 0}
+                showActions={showActions}
+                isBendahara={isBendahara}
+                canApprove={canApprove}
+                role={role}
+                submitting={approval.submitting}
+                approving={approval.approving}
+                rejecting={approval.rejecting}
+                showCheckbox={showCheckboxes}
+                checked={selected.has(t.id)}
+                isPenerimaan={isPenerimaan}
+                accountMap={accountMap}
+                onToggleCheck={selectableIds.includes(t.id) ? () => toggleSelect(t.id) : undefined}
+                onSubmit={handleSubmit}
+                onApprove={handleApprove}
+                onReject={openReject}
+                onEdit={t => setEditTarget(t)}
+                onDelete={t => setDeleteTarget(t)}
+              />
+            ))}
+          </TableBody>
+        </Table>
+
+        {/* Paginasi */}
+        {usePagination && totalRows > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPage={setPage}
+            onPageSize={size => { setPageSize(size); setPage(1) }}
+          />
+        )}
+
+        {/* Modal edit */}
+        {editTarget && (
+          <TransactionFormModal
+            open
+            onClose={() => setEditTarget(null)}
+            txType={editTarget.type === 'penerimaan' ? 'IN' : 'OUT'}
+            onSuccess={handleEditSuccess}
+            editTx={editTarget}
+          />
+        )}
+
+        {/* Modal hapus */}
+        <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="Hapus Transaksi">
+          <div className="space-y-4">
+            <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
+              Yakin ingin menghapus transaksi{' '}
+              <span className="font-semibold" style={{ color: '#e8eaf0' }}>{deleteTarget?.nomorBukti}</span>?{' '}
+              Tindakan ini tidak dapat diurungkan.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>Batal</Button>
+              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={deleting} onClick={handleDeleteConfirm}>
+                {deleting ? 'Menghapus...' : 'Hapus'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal hapus massal */}
+        <Modal open={bulkDeleteOpen} onClose={() => setBulkDeleteOpen(false)} title="Hapus Transaksi Massal">
+          <div className="space-y-4">
+            <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
+              Yakin ingin menghapus{' '}
+              <span className="font-semibold" style={{ color: '#f87171' }}>{selected.size} transaksi</span>{' '}
+              yang dipilih? Tindakan ini tidak dapat diurungkan.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)}>Batal</Button>
+              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={bulkDeleting} onClick={handleBulkDelete}>
+                {bulkDeleting ? 'Menghapus...' : `Hapus ${selected.size} Transaksi`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal setujui massal */}
+        <Modal open={bulkApproveOpen} onClose={() => setBulkApproveOpen(false)} title="Setujui Transaksi Massal">
+          <div className="space-y-4">
+            <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
+              Yakin ingin menyetujui{' '}
+              <span className="font-semibold" style={{ color: '#4ade80' }}>{approvableSelected.length} transaksi</span>{' '}
+              yang dipilih?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setBulkApproveOpen(false)}>Batal</Button>
+              <Button variant="primary" size="sm" icon="check_circle" disabled={bulkApproving} onClick={handleBulkApprove}>
+                {bulkApproving ? 'Memproses...' : `Setujui ${approvableSelected.length} Transaksi`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal tolak massal */}
+        <Modal open={bulkRejectOpen} onClose={() => setBulkRejectOpen(false)} title="Tolak Transaksi Massal">
+          <div className="space-y-4">
+            <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
+              Tolak{' '}
+              <span className="font-semibold" style={{ color: '#f87171' }}>{approvableSelected.length} transaksi</span>{' '}
+              yang dipilih. Berikan catatan penolakan (opsional):
+            </p>
+            <textarea
+              className="w-full px-3 py-2 rounded-xl text-sm font-body resize-none focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e8eaf0' }}
+              rows={3}
+              placeholder="Alasan penolakan..."
+              value={bulkRejectNote}
+              onChange={e => setBulkRejectNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setBulkRejectOpen(false)}>Batal</Button>
+              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={bulkRejecting} onClick={handleBulkReject}>
+                {bulkRejecting ? 'Memproses...' : `Tolak ${approvableSelected.length} Transaksi`}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Modal tolak */}
+        <Modal open={rejectTarget !== null} onClose={() => setRejectTarget(null)} title="Tolak Transaksi">
+          <div className="space-y-4">
+            <p className="text-sm font-body" style={{ color: 'rgba(232,234,240,0.6)' }}>
+              Berikan catatan penolakan (opsional):
+            </p>
+            <textarea
+              className="w-full px-3 py-2 rounded-xl text-sm font-body resize-none focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e8eaf0' }}
+              rows={3}
+              placeholder="Alasan penolakan..."
+              value={rejectNote}
+              onChange={e => setRejectNote(e.target.value)}
+            />
+            {actionError && (
+              <p className="text-sm font-body" style={{ color: '#f87171' }}>{actionError}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="sm" onClick={() => setRejectTarget(null)}>Batal</Button>
+              <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={approval.rejecting} onClick={handleRejectConfirm}>
+                {approval.rejecting ? 'Memproses...' : 'Tolak'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      </>}
+
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+    </>
+  )
+}
+
+// ─── Summary Card ─────────────────────────────────────────────────────────────
+
+function SummaryCard({ label, value, icon, color, warning }: {
+  label:    string
+  value:    string
+  icon:     string
+  color:    string
+  warning?: boolean
+}) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-xl"
+      style={{
+        background: warning ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${warning ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.07)'}`,
+      }}
+    >
+      <span className="material-symbols-outlined text-2xl" style={{ color, flexShrink: 0 }}>{icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs text-on-surface-variant truncate">{label}</p>
+        <p className="text-sm font-semibold truncate" style={{ color }}>{value}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Komponen Paginasi ────────────────────────────────────────────────────────
+
+interface PaginationProps {
+  page:       number
+  totalPages: number
+  pageSize:   number
+  totalRows:  number
+  startIndex: number
+  endIndex:   number
+  onPage:     (p: number) => void
+  onPageSize: (s: number) => void
+}
+
+function getPageNumbers(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | '…')[] = [1]
+  if (current > 3) pages.push('…')
+  const lo = Math.max(2, current - 1)
+  const hi = Math.min(total - 1, current + 1)
+  for (let i = lo; i <= hi; i++) pages.push(i)
+  if (current < total - 2) pages.push('…')
+  pages.push(total)
+  return pages
+}
+
+function Pagination({ page, totalPages, pageSize, totalRows, startIndex, endIndex, onPage, onPageSize }: PaginationProps) {
+  const pages = getPageNumbers(page, totalPages)
+
+  const btnBase     = 'inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg text-xs font-medium transition-colors select-none'
+  const btnActive   = 'bg-primary text-on-primary'
+  const btnInactive = 'text-on-surface-variant hover:bg-surface-container-high'
+  const btnDisabled = 'opacity-30 cursor-not-allowed'
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-3 text-xs text-on-surface-variant">
+        <span>{totalRows === 0 ? '0 data' : `${startIndex}–${endIndex} dari ${totalRows} transaksi`}</span>
+        <span className="text-outline-variant">|</span>
+        <label className="flex items-center gap-1.5">
+          Baris:
+          <select
+            value={pageSize}
+            onChange={e => onPageSize(Number(e.target.value))}
+            className="h-7 px-2 rounded-lg text-xs text-on-surface focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            {PAGE_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center gap-1">
+          <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(1)} disabled={page === 1} title="Halaman pertama">
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>first_page</span>
+          </button>
+          <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(page - 1)} disabled={page === 1} title="Sebelumnya">
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_left</span>
+          </button>
+          {pages.map((p, i) =>
+            p === '…'
+              ? <span key={`e-${i}`} className="px-1 text-xs text-on-surface-variant select-none">…</span>
+              : <button key={p} className={`${btnBase} ${p === page ? btnActive : btnInactive}`} onClick={() => onPage(p as number)}>{p}</button>
+          )}
+          <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(page + 1)} disabled={page === totalPages} title="Berikutnya">
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_right</span>
+          </button>
+          <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(totalPages)} disabled={page === totalPages} title="Halaman terakhir">
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>last_page</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Transaction Row ──────────────────────────────────────────────────────────
+
+interface RowProps {
+  transaction:    Transaction
+  even:           boolean
+  showActions:    boolean
+  isBendahara:    boolean
+  canApprove:     boolean
+  role:           string
+  submitting:     boolean
+  approving:      boolean
+  rejecting:      boolean
+  showCheckbox:   boolean
+  checked:        boolean
+  isPenerimaan:   boolean
+  accountMap:     Record<string, DbBankAccount>
+  onToggleCheck?: () => void
+  onSubmit:       (id: string) => void
+  onApprove:      (id: string) => void
+  onReject:       (id: string) => void
+  onEdit:         (tx: Transaction) => void
+  onDelete:       (tx: Transaction) => void
+}
+
+function TransactionRow({
+  transaction: t, even,
+  showActions, isBendahara, canApprove, role,
+  submitting, approving, rejecting,
+  showCheckbox, checked, isPenerimaan, accountMap, onToggleCheck,
+  onSubmit, onApprove, onReject, onEdit, onDelete,
+}: RowProps) {
+  const missingAccount = isPenerimaan && !t.destinationAccountId
+  const account = isPenerimaan && t.destinationAccountId ? accountMap[t.destinationAccountId] : null
+
+  return (
+    <TableRow even={even}>
+      {showCheckbox && (
+        <TableCell align="center">
+          {onToggleCheck
+            ? <input type="checkbox" className="w-4 h-4 accent-primary cursor-pointer" checked={checked} onChange={onToggleCheck} />
+            : <span className="w-4 h-4 block" />
+          }
+        </TableCell>
+      )}
+      <TableCell>
+        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.45)' }}>{formatTanggal(t.tanggal)}</span>
+      </TableCell>
+      <TableCell>
+        <span className="text-xs font-medium font-body" style={{ color: '#9B6DFF' }}>{t.nomorBukti}</span>
+      </TableCell>
+      <TableCell>
+        <div>
+          <span className="text-sm font-body" style={{ color: '#e8eaf0' }}>{t.deskripsi}</span>
+          {t.status === 'ditolak' && t.rejectionNote && (
+            <p className="text-xs font-body mt-0.5 italic" style={{ color: '#f87171' }}>Catatan: {t.rejectionNote}</p>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <span className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.45)' }}>{t.kategori}</span>
+      </TableCell>
+
+      {/* Kolom rekening bank — hanya BPN */}
+      {isPenerimaan && (
+        <TableCell>
+          {missingAccount ? (
+            <span className="inline-flex items-center gap-1 text-xs" style={{ color: '#f87171' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>warning</span>
+              Belum diisi
+            </span>
+          ) : account ? (
+            <div>
+              <span className="text-xs font-medium" style={{ color: 'rgba(232,234,240,0.8)' }}>{account.bank_name}</span>
+              <p className="text-xs font-mono" style={{ color: 'rgba(232,234,240,0.4)' }}>{account.account_number}</p>
+            </div>
+          ) : (
+            <span className="text-xs" style={{ color: 'rgba(232,234,240,0.3)' }}>—</span>
+          )}
+        </TableCell>
+      )}
+
+      <TableCell align="right">
+        <span
+          className="font-data font-medium tabular-nums tracking-financial text-sm"
+          style={{ color: t.type === 'penerimaan' ? '#4ade80' : '#e8eaf0' }}
+        >
+          {t.type === 'penerimaan' ? '+' : '-'}{formatRupiah(t.nominal)}
+        </span>
+      </TableCell>
+      <TableCell align="center">
+        <StatusBadge status={t.status} />
+      </TableCell>
+      {showActions && (
+        <TableCell align="center">
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {isBendahara && t.status === 'pending' && (
+              <>
+                <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(t)}>
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" icon="send" disabled={submitting} onClick={() => onSubmit(t.id)}>
+                  Ajukan
+                </Button>
+              </>
+            )}
+            {isBendahara && t.status === 'ditolak' && (
+              <Button variant="ghost" size="sm" icon="edit" onClick={() => onEdit(t)}>
+                Edit
+              </Button>
+            )}
+            {((isBendahara && (t.status === 'pending' || t.status === 'ditolak')) ||
+              (role === 'admin' && t.status !== 'diajukan')) && (
+              <Button variant="ghost" size="sm" icon="delete" className="!text-[#f87171]" onClick={() => onDelete(t)}>
+                Hapus
+              </Button>
+            )}
+            {canApprove && t.status === 'diajukan' && (
+              <>
+                <Button variant="ghost" size="sm" icon="check_circle" disabled={approving} className="!text-[#4ade80]" onClick={() => onApprove(t.id)}>
+                  Setujui
+                </Button>
+                <Button variant="ghost" size="sm" icon="cancel" disabled={rejecting} className="!text-[#f87171]" onClick={() => onReject(t.id)}>
+                  Tolak
+                </Button>
+              </>
+            )}
+          </div>
+        </TableCell>
+      )}
+    </TableRow>
+  )
+}
