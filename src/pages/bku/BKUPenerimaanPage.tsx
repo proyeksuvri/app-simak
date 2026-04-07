@@ -32,9 +32,15 @@ export function BKUPenerimaanPage() {
     setPage(1)
   }, [])
 
+  const handleCategoryChange = (val: string) => {
+    setPrintCategory(val)
+    setPage(1)
+  }
+
   // ── Filter entries client-side ──────────────────────────────────────────
   const filteredEntries = useMemo(() => {
     return entries.filter(e => {
+      if (printCategory && e.kategori !== printCategory) return false
       if (filter.bulan !== null) {
         const bulanEntri = Number(e.tanggal.slice(5, 7))
         if (bulanEntri !== filter.bulan) return false
@@ -43,7 +49,7 @@ export function BKUPenerimaanPage() {
       if (filter.tanggalSampai && e.tanggal > filter.tanggalSampai) return false
       return true
     })
-  }, [entries, filter])
+  }, [entries, filter, printCategory])
 
   // Recalculate saldo berjalan untuk entri yang terfilter
   const filteredWithSaldo = useMemo(() => {
@@ -70,49 +76,27 @@ export function BKUPenerimaanPage() {
   const isFiltered = filter.bulan !== null || filter.tanggalDari !== '' || filter.tanggalSampai !== ''
 
   const handleCetak = () => {
-    if (printCategory) {
-      const pembantuEntries = entries.filter(e => e.kategori === printCategory)
-      let saldoPembantu = 0
-      const pembantuWithSaldo = pembantuEntries.map(e => {
-        saldoPembantu = saldoPembantu + e.debit - e.kredit
-        return { ...e, saldo: saldoPembantu }
-      })
-      const pembantuSaldoAkhir = pembantuWithSaldo.length > 0 
-        ? pembantuWithSaldo[pembantuWithSaldo.length - 1].saldo 
-        : 0
-
-      printBKU({
-        entries:       pembantuWithSaldo,
-        saldoAkhir:    pembantuSaldoAkhir,
-        tahunAnggaran,
-        namaUnit:      'UIN Palopo',
-        namaBendahara: currentUser.nama,
-        nip:           currentUser.nip,
-        kategoriPembantu: printCategory,
-      })
-      return
-    }
-
-    // Cetak sesuai data yang sedang ditampilkan (terfilter jika aktif)
     printBKU({
-      entries:       isFiltered ? filteredWithSaldo : entries,
-      saldoAkhir:    isFiltered ? filteredSaldoAkhir : saldoAkhir,
+      entries:          isFiltered || printCategory ? filteredWithSaldo : entries,
+      saldoAkhir:       isFiltered || printCategory ? filteredSaldoAkhir : saldoAkhir,
       tahunAnggaran,
-      namaUnit:      'UIN Palopo',
-      namaBendahara: currentUser.nama,
-      nip:           currentUser.nip,
+      namaUnit:         'UIN Palopo',
+      namaBendahara:    currentUser.nama,
+      nip:              currentUser.nip,
+      kategoriPembantu: printCategory || undefined,
+      tipeBKU:          printCategory ? 'pembantu' : 'penerimaan',
     })
   }
 
   return (
     <PageContainer
-      title="BKU Penerimaan"
+      title={printCategory ? `BKU Pembantu: ${printCategory}` : 'BKU Penerimaan'}
       actions={
         <div className="flex items-center gap-3">
           {categories.length > 0 && (
             <select
               value={printCategory}
-              onChange={e => setPrintCategory(e.target.value)}
+              onChange={e => handleCategoryChange(e.target.value)}
               className="px-3 py-1.5 rounded-lg text-xs font-body font-medium transition-colors hover:bg-white/5 cursor-pointer outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e8eaf0' }}
             >

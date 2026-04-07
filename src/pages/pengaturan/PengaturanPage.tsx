@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
+import { Table, TableHead, TableHeadCell, TableBody, TableRow, TableCell } from '../../components/ui/Table/Table'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -8,7 +9,7 @@ import { useAppContext } from '../../context/AppContext'
 import { useUsers } from '../../hooks/useUsers'
 import { useManagePeriods } from '../../hooks/useManagePeriods'
 import { useUserManagement, type CreateUserPayload, type EditUserPayload, type UserRole, type BendaharaKategori } from '../../hooks/useUserManagement'
-import { useWorkUnits } from '../../hooks/useWorkUnits'
+import { useWorkUnits, useManageWorkUnits } from '../../hooks/useWorkUnits'
 import { useBankAccounts, useManageBankAccounts, type BankAccountInput } from '../../hooks/useBankAccounts'
 import { useRevenueCategories, useManageRevenueCategories } from '../../hooks/useRevenueCategories'
 import { useBusinessUnits, useManageBusinessUnits } from '../../hooks/useBusinessUnits'
@@ -16,7 +17,7 @@ import { useFundingSources, useManageFundingSources } from '../../hooks/useFundi
 import { useSumberPendapatanBisnis, useManageSumberPendapatanBisnis } from '../../hooks/useSumberPendapatanBisnis'
 import { USER_ROLE_LABELS } from '../../types'
 
-type PengaturanTab = 'profil' | 'periode' | 'user' | 'rekening' | 'kategori' | 'mekanisme' | 'jenis' | 'sumber'
+type PengaturanTab = 'profil' | 'periode' | 'user' | 'rekening' | 'kategori' | 'mekanisme' | 'jenis' | 'sumber' | 'unit-kerja'
 
 export function PengaturanPage() {
   const { currentUser, tahunAnggaran } = useAppContext()
@@ -77,6 +78,7 @@ export function PengaturanPage() {
             <TabButton label="Mekanisme Bisnis" active={activeTab === 'mekanisme'} onClick={() => setManualTab('mekanisme')} />
             <TabButton label="Jenis Pendapatan" active={activeTab === 'jenis'} onClick={() => setManualTab('jenis')} />
             <TabButton label="Sumber Pendapatan Bisnis" active={activeTab === 'sumber'} onClick={() => setManualTab('sumber')} />
+            <TabButton label="Unit Kerja" active={activeTab === 'unit-kerja'} onClick={() => setManualTab('unit-kerja')} />
           </>
         )}
       </div>
@@ -222,6 +224,10 @@ export function PengaturanPage() {
 
       {activeTab === 'sumber' && isAdmin && (
         <SumberPendapatanBisnisTab />
+      )}
+
+      {activeTab === 'unit-kerja' && isAdmin && (
+        <UnitKerjaTab />
       )}
     </PageContainer>
   )
@@ -678,8 +684,8 @@ function JenisPendapatanTab() {
       <Card padding="sm">
         <div className="px-4 pt-3 pb-2 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Jenis Pendapatan</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
+            <h3 className="text-sm font-semibold text-white font-headline">Jenis Pendapatan</h3>
+            <p className="text-xs text-white/60 font-body mt-0.5">
               {fundingSources.length} jenis terdaftar
             </p>
           </div>
@@ -696,27 +702,27 @@ function JenisPendapatanTab() {
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
+          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">Memuat...</p>
         ) : fundingSources.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
+          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">
             Belum ada jenis pendapatan. Klik "Tambah Jenis" untuk menambahkan.
           </p>
         ) : (
           <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
+            <thead className="bg-white/10 border-b border-white/20">
               <tr>
                 {['No', 'Nama Jenis Pendapatan', 'Kode Akun BAS', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
+                  <th key={h} className="px-4 py-2.5 text-left text-xs text-white uppercase tracking-wide font-semibold">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {fundingSources.map((f, idx) => (
-                <tr key={f.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface-variant text-xs w-12">{idx + 1}</td>
-                  <td className="px-4 py-2.5 text-on-surface font-medium">
+                <tr key={f.id} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                  <td className="px-4 py-2.5 text-white/50 text-xs w-12">{idx + 1}</td>
+                  <td className="px-4 py-2.5 text-white font-medium">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-tertiary"
+                      <span className="material-symbols-outlined text-[16px] text-primary"
                         style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
                         payments
                       </span>
@@ -726,13 +732,13 @@ function JenisPendapatanTab() {
                   <td className="px-4 py-2.5">
                     {f.kode_akun ? (
                       <div>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container text-on-secondary-container text-xs font-mono font-semibold">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/15 text-white text-xs font-mono font-semibold">
                           {f.kode_akun}
                         </span>
-                        <p className="text-xs text-on-surface-variant mt-0.5 leading-tight">{getBasUraian(f.kode_akun)}</p>
+                        <p className="text-xs text-white/60 mt-0.5 leading-tight">{getBasUraian(f.kode_akun)}</p>
                       </div>
                     ) : (
-                      <span className="text-xs text-on-surface-variant italic">— Belum dipetakan —</span>
+                      <span className="text-xs text-white/40 italic">— Belum dipetakan —</span>
                     )}
                   </td>
                   <td className="px-4 py-2.5">
@@ -1101,24 +1107,39 @@ const EMPTY_REKENING: BankAccountInput = { bank_name: '', account_number: '', ac
 
 function RekeningTab() {
   const { accounts, loading, refetch } = useBankAccounts()
-  const { createAccount, toggleActive, saving, error } = useManageBankAccounts()
+  const { createAccount, updateAccount, toggleActive, deleteAccount, saving, error } = useManageBankAccounts()
 
-  const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm]           = useState<BankAccountInput>(EMPTY_REKENING)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [success, setSuccess]     = useState<string | null>(null)
+  type ModalMode = 'create' | 'edit'
+  const [modalOpen,   setModalOpen]   = useState(false)
+  const [modalMode,   setModalMode]   = useState<ModalMode>('create')
+  const [editId,      setEditId]      = useState<string | null>(null)
+  const [form,        setForm]        = useState<BankAccountInput>(EMPTY_REKENING)
+  const [formError,   setFormError]   = useState<string | null>(null)
+  const [success,     setSuccess]     = useState<string | null>(null)
+  const [deleteId,    setDeleteId]    = useState<string | null>(null)
 
-  const openModal = () => { setForm(EMPTY_REKENING); setFormError(null); setModalOpen(true) }
+  const openCreate = () => {
+    setModalMode('create'); setEditId(null)
+    setForm(EMPTY_REKENING); setFormError(null); setModalOpen(true)
+  }
 
-  const handleCreate = async () => {
+  const openEdit = (a: { id: string; bank_name: string; account_number: string; account_name: string }) => {
+    setModalMode('edit'); setEditId(a.id)
+    setForm({ bank_name: a.bank_name, account_number: a.account_number, account_name: a.account_name })
+    setFormError(null); setModalOpen(true)
+  }
+
+  const handleSave = async () => {
     setFormError(null)
     if (!form.bank_name || !form.account_number || !form.account_name) {
       setFormError('Semua field wajib diisi.'); return
     }
-    const err = await createAccount(form)
+    const err = modalMode === 'edit' && editId
+      ? await updateAccount(editId, form)
+      : await createAccount(form)
     if (err) { setFormError(err); return }
     setModalOpen(false)
-    setSuccess('Rekening berhasil ditambahkan.')
+    setSuccess(modalMode === 'edit' ? 'Rekening berhasil diperbarui.' : 'Rekening berhasil ditambahkan.')
     refetch()
     setTimeout(() => setSuccess(null), 4000)
   }
@@ -1127,6 +1148,18 @@ function RekeningTab() {
     await toggleActive(id, !current)
     refetch()
   }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    const err = await deleteAccount(deleteId)
+    setDeleteId(null)
+    if (err) return
+    setSuccess('Rekening berhasil dihapus.')
+    refetch()
+    setTimeout(() => setSuccess(null), 4000)
+  }
+
+  const deleteTarget = accounts.find(a => a.id === deleteId)
 
   return (
     <>
@@ -1138,7 +1171,7 @@ function RekeningTab() {
               {accounts.length} rekening terdaftar
             </p>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openModal}>
+          <Button variant="primary" size="sm" icon="add" onClick={openCreate}>
             Tambah Rekening
           </Button>
         </div>
@@ -1161,47 +1194,68 @@ function RekeningTab() {
             Belum ada rekening. Klik "Tambah Rekening" untuk menambahkan.
           </p>
         ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
-              <tr>
-                {['Bank', 'No. Rekening', 'Atas Nama', 'Status', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHead>
+              <TableHeadCell>Bank</TableHeadCell>
+              <TableHeadCell>No. Rekening</TableHeadCell>
+              <TableHeadCell>Atas Nama</TableHeadCell>
+              <TableHeadCell>Status</TableHeadCell>
+              <TableHeadCell>Aksi</TableHeadCell>
+            </TableHead>
+            <TableBody>
               {accounts.map((a, idx) => (
-                <tr key={a.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface font-medium">{a.bank_name}</td>
-                  <td className="px-4 py-2.5 text-on-surface">{a.account_number}</td>
-                  <td className="px-4 py-2.5 text-on-surface">{a.account_name}</td>
-                  <td className="px-4 py-2.5">
+                <TableRow key={a.id} even={idx % 2 === 0}>
+                  <TableCell><span className="font-medium">{a.bank_name}</span></TableCell>
+                  <TableCell>{a.account_number}</TableCell>
+                  <TableCell>{a.account_name}</TableCell>
+                  <TableCell>
                     <span className={[
                       'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                       a.is_active
-                        ? 'bg-primary-fixed text-on-primary-fixed-variant'
-                        : 'bg-surface-container text-on-surface-variant',
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-white/10 text-white/40',
                     ].join(' ')}>
                       {a.is_active ? 'Aktif' : 'Nonaktif'}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      className={`text-xs hover:underline disabled:opacity-50 ${a.is_active ? 'text-error' : 'text-primary'}`}
-                      disabled={saving}
-                      onClick={() => handleToggle(a.id, a.is_active)}
-                    >
-                      {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <button
+                        className="text-xs text-primary hover:underline disabled:opacity-50"
+                        disabled={saving}
+                        onClick={() => openEdit(a)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className={`text-xs hover:underline disabled:opacity-50 ${a.is_active ? 'text-error' : 'text-primary'}`}
+                        disabled={saving}
+                        onClick={() => handleToggle(a.id, a.is_active)}
+                      >
+                        {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                      </button>
+                      <button
+                        className="text-xs text-error hover:underline disabled:opacity-50"
+                        disabled={saving}
+                        onClick={() => setDeleteId(a.id)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </Card>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Tambah Rekening Bank">
+      {/* Modal Tambah / Edit */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={modalMode === 'edit' ? 'Edit Rekening Bank' : 'Tambah Rekening Bank'}
+      >
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Bank" icon="account_balance">
             <input
@@ -1240,8 +1294,34 @@ function RekeningTab() {
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleCreate}>
-              {saving ? 'Menyimpan...' : 'Simpan'}
+            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleSave}>
+              {saving ? 'Menyimpan...' : modalMode === 'edit' ? 'Simpan Perubahan' : 'Simpan'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus */}
+      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus Rekening Bank">
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-on-surface font-body">
+            Yakin ingin menghapus rekening berikut?
+          </p>
+          {deleteTarget && (
+            <div className="rounded-xl bg-surface-container px-4 py-3 text-sm font-body space-y-1">
+              <p><span className="text-on-surface-variant">Bank:</span> <span className="font-medium text-on-surface">{deleteTarget.bank_name}</span></p>
+              <p><span className="text-on-surface-variant">No. Rekening:</span> <span className="font-medium text-on-surface">{deleteTarget.account_number}</span></p>
+              <p><span className="text-on-surface-variant">Atas Nama:</span> <span className="font-medium text-on-surface">{deleteTarget.account_name}</span></p>
+            </div>
+          )}
+          <p className="text-xs text-on-surface-variant font-body">
+            Rekening yang dihapus tidak akan muncul di daftar maupun form input transaksi.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="secondary" size="sm" onClick={() => setDeleteId(null)}>Batal</Button>
+            <Button variant="primary" size="sm" icon="delete" disabled={saving} onClick={handleDelete}
+              className="bg-error text-on-error hover:bg-error/90">
+              {saving ? 'Menghapus...' : 'Hapus'}
             </Button>
           </div>
         </div>
@@ -1909,6 +1989,241 @@ function SumberPendapatanBisnisTab() {
           <p className="text-sm text-on-surface">
             Hapus sumber pendapatan <span className="font-semibold">"{delName}"</span>?
             Transaksi yang sudah menggunakan sumber ini tidak akan terpengaruh.
+          </p>
+          {delError && (
+            <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{delError}</p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-6 pb-5">
+          <Button variant="ghost" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
+          <Button variant="primary" size="sm" disabled={saving} onClick={handleDelete}
+            className="!bg-error !text-on-error">
+            {saving ? 'Menghapus...' : 'Hapus'}
+          </Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tab Unit Kerja
+// ---------------------------------------------------------------------------
+function UnitKerjaTab() {
+  const { workUnits, loading, refetch } = useWorkUnits()
+  const { createWorkUnit, updateWorkUnit, deleteWorkUnit, saving } = useManageWorkUnits()
+
+  const [addOpen,   setAddOpen]   = useState(false)
+  const [editOpen,  setEditOpen]  = useState(false)
+  const [delOpen,   setDelOpen]   = useState(false)
+  const [editId,    setEditId]    = useState<string | null>(null)
+  const [delId,     setDelId]     = useState<string | null>(null)
+  const [delName,   setDelName]   = useState('')
+  const [formName,  setFormName]  = useState('')
+  const [parentId,  setParentId]  = useState<string>('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [success,   setSuccess]   = useState<string | null>(null)
+  const [delError,  setDelError]  = useState<string | null>(null)
+
+  const roots   = workUnits.filter(u => !u.parent_id)
+  const children = workUnits.filter(u => u.parent_id)
+
+  const openAdd = () => {
+    setFormName(''); setParentId(''); setFormError(null); setAddOpen(true)
+  }
+
+  const openEdit = (u: { id: string; name: string; parent_id: string | null }) => {
+    setEditId(u.id); setFormName(u.name); setParentId(u.parent_id ?? ''); setFormError(null); setEditOpen(true)
+  }
+
+  const openDel = (id: string, name: string) => {
+    setDelId(id); setDelName(name); setDelError(null); setDelOpen(true)
+  }
+
+  const showSuccess = (msg: string) => {
+    setSuccess(msg); setTimeout(() => setSuccess(null), 4000)
+  }
+
+  const handleAdd = async () => {
+    setFormError(null)
+    if (!formName.trim()) { setFormError('Nama unit kerja wajib diisi.'); return }
+    const err = await createWorkUnit(formName.trim(), parentId || null)
+    if (err) { setFormError(err); return }
+    setAddOpen(false); refetch(); showSuccess('Unit kerja berhasil ditambahkan.')
+  }
+
+  const handleEdit = async () => {
+    setFormError(null)
+    if (!formName.trim()) { setFormError('Nama unit kerja wajib diisi.'); return }
+    if (!editId) return
+    const err = await updateWorkUnit(editId, formName.trim(), parentId || null)
+    if (err) { setFormError(err); return }
+    setEditOpen(false); refetch(); showSuccess('Unit kerja berhasil diperbarui.')
+  }
+
+  const handleDelete = async () => {
+    if (!delId) return
+    setDelError(null)
+    const hasChildren = children.some(c => c.parent_id === delId)
+    if (hasChildren) { setDelError('Unit kerja ini memiliki sub-unit. Hapus sub-unit terlebih dahulu.'); return }
+    const err = await deleteWorkUnit(delId)
+    if (err) { setDelError(err); return }
+    setDelOpen(false); refetch(); showSuccess('Unit kerja berhasil dihapus.')
+  }
+
+  const formFieldsJsx = (
+    <div className="px-6 py-4 space-y-4">
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-1">
+          Nama Unit Kerja <span className="text-error">*</span>
+        </label>
+        <input
+          type="text"
+          placeholder="Contoh: FUAD, FTIK, LP2M"
+          value={formName}
+          onChange={e => { setFormName(e.target.value); setFormError(null) }}
+          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-on-surface-variant mb-1">
+          Induk Unit Kerja <span className="text-on-surface-variant font-normal">(opsional)</span>
+        </label>
+        <select
+          value={parentId}
+          onChange={e => setParentId(e.target.value)}
+          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+        >
+          <option value="">— Tidak ada (unit utama) —</option>
+          {roots.filter(r => r.id !== editId).map(r => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
+      </div>
+      {formError && (
+        <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{formError}</p>
+      )}
+    </div>
+  )
+
+  return (
+    <>
+      <Card padding="sm">
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-white font-headline">Unit Kerja</h3>
+            <p className="text-xs text-white/60 font-body mt-0.5">
+              {workUnits.length} unit terdaftar
+            </p>
+          </div>
+          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
+            Tambah Unit Kerja
+          </Button>
+        </div>
+
+        {success && (
+          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
+            {success}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">Memuat...</p>
+        ) : workUnits.length === 0 ? (
+          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">
+            Belum ada unit kerja. Klik "Tambah Unit Kerja" untuk menambahkan.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/20 bg-white/10">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Nama Unit Kerja</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Induk</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Sub-Unit</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold text-white uppercase tracking-wide">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workUnits.map((u, idx) => {
+                const parent = workUnits.find(p => p.id === u.parent_id)
+                const subCount = children.filter(c => c.parent_id === u.id).length
+                return (
+                  <tr key={u.id} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
+                    <td className="px-4 py-2.5">
+                      <span className="font-semibold text-white">{u.name}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {parent
+                        ? <span className="text-white/80">{parent.name}</span>
+                        : <span className="text-white/30 italic">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {subCount > 0
+                        ? <span className="text-xs bg-primary/30 text-primary-container px-2 py-0.5 rounded-full font-medium">{subCount} sub-unit</span>
+                        : <span className="text-white/30">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEdit(u)}
+                          className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
+                          title="Edit"
+                        >
+                          <span className="material-symbols-outlined text-[16px]"
+                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                            edit
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => openDel(u.id, u.name)}
+                          className="p-1.5 rounded-lg text-error hover:bg-error-container transition-colors"
+                          title="Hapus"
+                        >
+                          <span className="material-symbols-outlined text-[16px]"
+                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                            delete
+                          </span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      {/* Modal Tambah */}
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Unit Kerja" maxWidth="sm">
+        {formFieldsJsx}
+        <div className="flex justify-end gap-2 px-6 pb-5">
+          <Button variant="ghost" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
+          <Button variant="primary" size="sm" disabled={saving} onClick={handleAdd}>
+            {saving ? 'Menyimpan...' : 'Simpan'}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Modal Edit */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Unit Kerja" maxWidth="sm">
+        {formFieldsJsx}
+        <div className="flex justify-end gap-2 px-6 pb-5">
+          <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
+          <Button variant="primary" size="sm" disabled={saving} onClick={handleEdit}>
+            {saving ? 'Menyimpan...' : 'Perbarui'}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Modal Hapus */}
+      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Unit Kerja" maxWidth="sm">
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-on-surface">
+            Hapus unit kerja <span className="font-semibold">"{delName}"</span>?
+            Transaksi yang sudah menggunakan unit ini tidak akan terpengaruh.
           </p>
           {delError && (
             <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{delError}</p>

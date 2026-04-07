@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import type { BKUType, BKUEntryWithSaldo } from '../../types'
 import {
   Table, TableHead, TableHeadCell, TableBody, TableRow, TableCell,
@@ -37,6 +38,87 @@ function DbStatusBadge({ status }: { status: DbStatus }) {
   )
 }
 
+// ── Paginasi ─────────────────────────────────────────────────────────────────
+interface PaginationProps {
+  page:       number
+  totalPages: number
+  pageSize:   number
+  total:      number
+  onChange:   (page: number) => void
+}
+
+function Pagination({ page, totalPages, pageSize, total, onChange }: PaginationProps) {
+  const from = (page - 1) * pageSize + 1
+  const to   = Math.min(page * pageSize, total)
+
+  // Buat array nomor halaman dengan ellipsis
+  function getPages(): (number | '...')[] {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
+    const pages: (number | '...')[] = [1]
+    if (page > 3) pages.push('...')
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+      pages.push(i)
+    }
+    if (page < totalPages - 2) pages.push('...')
+    pages.push(totalPages)
+    return pages
+  }
+
+  const btnBase = 'inline-flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-lg text-xs font-medium transition-all duration-150 font-body select-none'
+  const btnActive = 'bg-primary text-on-primary shadow-sm'
+  const btnIdle   = 'text-[#e8eaf0] hover:bg-white/10 active:bg-white/15'
+  const btnDisabled = 'text-[#e8eaf0]/25 cursor-not-allowed'
+
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/10">
+      {/* Info baris */}
+      <p className="text-xs text-[#bfc8c4] font-body order-2 sm:order-1">
+        Menampilkan <span className="font-semibold text-[#e8eaf0]">{from}–{to}</span> dari{' '}
+        <span className="font-semibold text-[#e8eaf0]">{total}</span> entri
+      </p>
+
+      {/* Kontrol halaman */}
+      <div className="flex items-center gap-1 order-1 sm:order-2">
+        {/* Prev */}
+        <button
+          className={[btnBase, page === 1 ? btnDisabled : btnIdle].join(' ')}
+          onClick={() => page > 1 && onChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Halaman sebelumnya"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_left</span>
+        </button>
+
+        {/* Nomor halaman */}
+        {getPages().map((p, i) =>
+          p === '...' ? (
+            <span key={`ellipsis-${i}`} className="w-8 text-center text-xs text-[#bfc8c4] select-none">…</span>
+          ) : (
+            <button
+              key={p}
+              className={[btnBase, p === page ? btnActive : btnIdle].join(' ')}
+              onClick={() => onChange(p)}
+              aria-current={p === page ? 'page' : undefined}
+            >
+              {p}
+            </button>
+          )
+        )}
+
+        {/* Next */}
+        <button
+          className={[btnBase, page === totalPages ? btnDisabled : btnIdle].join(' ')}
+          onClick={() => page < totalPages && onChange(page + 1)}
+          disabled={page === totalPages}
+          aria-label="Halaman berikutnya"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_right</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Props ────────────────────────────────────────────────────────────────────
 interface BKULedgerProps {
   type:              BKUType
@@ -45,6 +127,8 @@ interface BKULedgerProps {
   entriesOverride?:     BKUEntryWithSaldo[]
   saldoAkhirOverride?:  number
   loadingOverride?:     boolean
+  /** Jumlah baris per halaman. 0 = tanpa paginasi (default). */
+  pageSize?:            number
 }
 
 // ── Skeleton ─────────────────────────────────────────────────────────────────
@@ -81,13 +165,18 @@ function BKUSkeleton() {
 const TODAY = new Date().toISOString().slice(0, 10)
 
 // ── Komponen utama ────────────────────────────────────────────────────────────
-export function BKULedger({ type, unitId, entriesOverride, saldoAkhirOverride, loadingOverride }: BKULedgerProps) {
+export function BKULedger({ type, unitId, entriesOverride, saldoAkhirOverride, loadingOverride, pageSize = 0 }: BKULedgerProps) {
   const bku = useBKU(entriesOverride === undefined ? type : 'penerimaan', entriesOverride === undefined ? unitId : undefined)
 
   // mode controlled: gunakan override jika ada, fallback ke useBKU
   const entries    = entriesOverride    ?? bku.entries
   const saldoAkhir = saldoAkhirOverride ?? bku.saldoAkhir
   const loading    = loadingOverride    ?? bku.loading
+
+  const [page, setPage] = useState(1)
+
+  // Reset ke halaman 1 saat data berubah
+  useEffect(() => { setPage(1) }, [entries])
 
   if (loading) {
     return <BKUSkeleton />
@@ -96,6 +185,12 @@ export function BKULedger({ type, unitId, entriesOverride, saldoAkhirOverride, l
   if (entries.length === 0) {
     return <EmptyState icon="menu_book" title="Tidak ada entri BKU" message="Entri akan muncul setelah transaksi diinput." />
   }
+
+  const usePagination = pageSize > 0 && entries.length > pageSize
+  const totalPages    = usePagination ? Math.ceil(entries.length / pageSize) : 1
+  const visibleEntries = usePagination
+    ? entries.slice((page - 1) * pageSize, page * pageSize)
+    : entries
 
   return (
     <div className="space-y-3">
@@ -110,7 +205,7 @@ export function BKULedger({ type, unitId, entriesOverride, saldoAkhirOverride, l
           <TableHeadCell align="right">Saldo</TableHeadCell>
         </TableHead>
         <TableBody>
-          {entries.map((entry, idx) => {
+          {visibleEntries.map((entry, idx) => {
             const isToday = entry.tanggal === TODAY
             return (
               <TableRow
@@ -183,6 +278,17 @@ export function BKULedger({ type, unitId, entriesOverride, saldoAkhirOverride, l
           })}
         </TableBody>
       </Table>
+
+      {/* Paginasi */}
+      {usePagination && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          total={entries.length}
+          onChange={setPage}
+        />
+      )}
 
       {/* Saldo Akhir */}
       <div className="flex justify-end">

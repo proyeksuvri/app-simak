@@ -12,7 +12,7 @@ export function Table({ children }: { children: ReactNode }) {
 
 export function TableHead({ children }: { children: ReactNode }) {
   return (
-    <thead style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+    <thead style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)' }}>
       <tr>{children}</tr>
     </thead>
   )
@@ -29,7 +29,7 @@ export function TableHeadCell({
   return (
     <th
       className={['px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-widest font-body', alignClass].join(' ')}
-      style={{ color: 'rgba(232,234,240,0.7)' }}
+      style={{ color: 'rgba(255,255,255,0.95)' }}
     >
       {children}
     </th>
@@ -52,8 +52,8 @@ export function TableRow({
   return (
     <tr
       style={{
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-        background: even ? 'rgba(255,255,255,0.02)' : 'transparent',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        background: even ? 'rgba(255,255,255,0.05)' : 'transparent',
         ...style,
       }}
     >
@@ -75,7 +75,7 @@ export function TableCell({
   return (
     <td
       className={['px-4 py-3.5', alignClass, className].join(' ')}
-      style={{ color: '#e8eaf0' }}
+      style={{ color: 'rgba(255,255,255,0.92)' }}
     >
       {children}
     </td>

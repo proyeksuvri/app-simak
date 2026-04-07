@@ -60,3 +60,5 @@
     letter-spacing: 0.05em;
   }
 }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }

@@ -11,8 +11,10 @@ export interface BKUEntry {
   kredit:      number   // kas keluar (BPK) — 0 jika penerimaan
   bkuType:     BKUType
   unitId:      string | null
-  status?:     TransactionStatus | null  // status transaksi dari DB
-  kategori?:   string | null
+  status?:          TransactionStatus | null  // status transaksi dari DB
+  kategori?:        string | null
+  sourceAccountId?:   string | null
+  jenisPendapatanId?: string | null
 }
 
 

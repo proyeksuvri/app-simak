@@ -89,8 +89,8 @@ function parseDate(raw: string): string | null {
     return `${yr}-${dmy2[2].padStart(2, '0')}-${dmy2[1].padStart(2, '0')}`
   }
 
-  // DD/MM/YYYY atau DD-MM-YYYY
-  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+  // DD/MM/YYYY atau DD-MM-YYYY (dengan atau tanpa waktu, mis. 26/03/2026 09.54.43)
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[\s\-T].*)?$/)
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
 
   // YYYY-MM-DD

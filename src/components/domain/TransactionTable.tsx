@@ -26,6 +26,22 @@ const STATUS_OPTIONS: { label: string; value: Transaction['status'] | '' }[] = [
   { label: 'Ditolak',      value: 'ditolak' },
 ]
 
+const BULAN_OPTIONS = [
+  { label: 'Semua Bulan', value: '' },
+  { label: 'Januari',    value: '01' },
+  { label: 'Februari',   value: '02' },
+  { label: 'Maret',      value: '03' },
+  { label: 'April',      value: '04' },
+  { label: 'Mei',        value: '05' },
+  { label: 'Juni',       value: '06' },
+  { label: 'Juli',       value: '07' },
+  { label: 'Agustus',    value: '08' },
+  { label: 'September',  value: '09' },
+  { label: 'Oktober',    value: '10' },
+  { label: 'November',   value: '11' },
+  { label: 'Desember',   value: '12' },
+]
+
 interface TransactionTableProps {
   filterType?:     TransactionType
   filterStatus?:   Transaction['status']
@@ -107,6 +123,34 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
   const [filterStatusLocal, setFilterStatusLocal] = useState<Transaction['status'] | ''>('')
   const [dateFrom,          setDateFrom]          = useState('')
   const [dateTo,            setDateTo]            = useState('')
+  const [filterMonth,       setFilterMonth]       = useState('')
+  const [filterAccountId,   setFilterAccountId]   = useState('')
+  const [sortField,         setSortField]         = useState<'tanggal' | 'nominal' | null>(null)
+  const [sortDir,           setSortDir]           = useState<'asc' | 'desc'>('asc')
+
+  function toggleSort(field: 'tanggal' | 'nominal') {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') }
+  }
+
+  function setQuickDate(period: 'week' | 'month' | 'year') {
+    const today = new Date()
+    if (period === 'week') {
+      const day = today.getDay() || 7
+      const mon = new Date(today); mon.setDate(today.getDate() - day + 1)
+      const sun = new Date(mon);   sun.setDate(mon.getDate() + 6)
+      setDateFrom(mon.toISOString().slice(0, 10))
+      setDateTo(sun.toISOString().slice(0, 10))
+    } else if (period === 'month') {
+      const y = today.getFullYear(), m = today.getMonth()
+      setDateFrom(new Date(y, m, 1).toISOString().slice(0, 10))
+      setDateTo(new Date(y, m + 1, 0).toISOString().slice(0, 10))
+    } else {
+      const y = today.getFullYear()
+      setDateFrom(`${y}-01-01`)
+      setDateTo(`${y}-12-31`)
+    }
+  }
 
   // ── Paginasi ────────────────────────────────────────────────────────────────
   const [page,     setPage]     = useState(1)
@@ -130,20 +174,29 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
     if (dateFrom) result = result.filter(t => t.tanggal >= dateFrom)
     if (dateTo)   result = result.filter(t => t.tanggal <= dateTo)
 
-    return result
-  }, [transactions, filterKategori, searchText, filterStatusLocal, dateFrom, dateTo])
+    if (filterMonth)     result = result.filter(t => t.tanggal.slice(5, 7) === filterMonth)
+    if (filterAccountId) result = result.filter(t => t.destinationAccountId === filterAccountId)
 
-  // ── Summary stats (dari semua transaksi, bukan filtered) ───────────────────
-  const stats = useMemo(() => {
-    const base = filterKategori ? transactions.filter(t => t.kategori === filterKategori) : transactions
-    return {
-      totalNominal:   base.filter(t => t.status === 'terverifikasi').reduce((s, t) => s + t.nominal, 0),
-      countDraft:     base.filter(t => t.status === 'pending').length,
-      countDiajukan:  base.filter(t => t.status === 'diajukan').length,
-      countVerified:  base.filter(t => t.status === 'terverifikasi').length,
-      missingAccount: base.filter(t => t.type === 'penerimaan' && !t.destinationAccountId).length,
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        const v = sortField === 'tanggal'
+          ? a.tanggal.localeCompare(b.tanggal)
+          : a.nominal - b.nominal
+        return sortDir === 'asc' ? v : -v
+      })
     }
-  }, [transactions, filterKategori])
+
+    return result
+  }, [transactions, filterKategori, searchText, filterStatusLocal, dateFrom, dateTo, filterMonth, filterAccountId, sortField, sortDir])
+
+  // ── Summary stats (mengikuti filter aktif) ────────────────────────────────
+  const stats = useMemo(() => ({
+    totalNominal:   filtered.filter(t => t.status === 'terverifikasi').reduce((s, t) => s + t.nominal, 0),
+    countDraft:     filtered.filter(t => t.status === 'pending').length,
+    countDiajukan:  filtered.filter(t => t.status === 'diajukan').length,
+    countVerified:  filtered.filter(t => t.status === 'terverifikasi').length,
+    missingAccount: filtered.filter(t => t.type === 'penerimaan' && !t.destinationAccountId).length,
+  }), [filtered])
 
   // Jika prop limit dipakai (mode ringkasan), tidak pakai paginasi
   const usePagination = !limit
@@ -153,7 +206,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
   // Reset ke halaman 1 jika filter berubah
   useEffect(() => {
     setPage(1)
-  }, [filterType, filterStatus, filterUnitId, filterKategori, pageSize, searchText, filterStatusLocal, dateFrom, dateTo])
+  }, [filterType, filterStatus, filterUnitId, filterKategori, pageSize, searchText, filterStatusLocal, dateFrom, dateTo, filterMonth, filterAccountId])
 
   const rows = useMemo(() => {
     if (!usePagination) return filtered.slice(0, limit)
@@ -343,13 +396,15 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
     onMutated?.()
   }
 
-  const hasActiveFilter = !!searchText || !!filterStatusLocal || !!dateFrom || !!dateTo
+  const hasActiveFilter = !!searchText || !!filterStatusLocal || !!dateFrom || !!dateTo || !!filterMonth || !!filterAccountId
 
   function resetFilters() {
     setSearchText('')
     setFilterStatusLocal('')
     setDateFrom('')
     setDateTo('')
+    setFilterMonth('')
+    setFilterAccountId('')
   }
 
   // ── Lookup nama rekening ─────────────────────────────────────────────────────
@@ -403,72 +458,119 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
       {/* ── Filter Bar ─────────────────────────────────────────────────────── */}
       {!limit && (
-        <div className="mb-4 flex flex-wrap gap-2 items-end">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
-            <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ fontSize: '1rem', color: 'rgba(232,234,240,0.4)' }}>search</span>
-            <input
-              type="text"
-              placeholder="Cari deskripsi / no. bukti…"
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+        <div className="mb-4 space-y-2">
+          {/* Baris 1: Search + Status + Bulan + Bank */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[180px]">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ fontSize: '1rem', color: 'rgba(232,234,240,0.4)' }}>search</span>
+              <input
+                type="text"
+                placeholder="Cari deskripsi / no. bukti…"
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
+              />
+            </div>
+
+            {/* Status */}
+            <select
+              value={filterStatusLocal}
+              onChange={e => setFilterStatusLocal(e.target.value as Transaction['status'] | '')}
+              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
-            />
-          </div>
-
-          {/* Status */}
-          <select
-            value={filterStatusLocal}
-            onChange={e => setFilterStatusLocal(e.target.value as Transaction['status'] | '')}
-            className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
-          >
-            {STATUS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value} style={{ background: '#1e2430', color: '#e8eaf0' }}>{o.label}</option>
-            ))}
-          </select>
-
-          {/* Tanggal dari */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>Dari</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={e => setDateFrom(e.target.value)}
-              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
-            />
-          </div>
-
-          {/* Tanggal sampai */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>s/d</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={e => setDateTo(e.target.value)}
-              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
-            />
-          </div>
-
-          {/* Reset */}
-          {hasActiveFilter && (
-            <button
-              onClick={resetFilters}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-outline-variant transition-colors"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '0.95rem' }}>filter_alt_off</span>
-              Reset
-            </button>
-          )}
+              {STATUS_OPTIONS.map(o => (
+                <option key={o.value} value={o.value} style={{ background: '#1e2430', color: '#e8eaf0' }}>{o.label}</option>
+              ))}
+            </select>
 
-          {hasActiveFilter && (
-            <span className="text-xs text-on-surface-variant ml-1">
-              {filtered.length} dari {transactions.length} transaksi
-            </span>
-          )}
+            {/* Bulan */}
+            <select
+              value={filterMonth}
+              onChange={e => setFilterMonth(e.target.value)}
+              className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
+            >
+              {BULAN_OPTIONS.map(o => (
+                <option key={o.value} value={o.value} style={{ background: '#1e2430', color: '#e8eaf0' }}>{o.label}</option>
+              ))}
+            </select>
+
+            {/* Bank (hanya untuk BPN) */}
+            {isPenerimaan && accounts.length > 0 && (
+              <select
+                value={filterAccountId}
+                onChange={e => setFilterAccountId(e.target.value)}
+                className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0' }}
+              >
+                <option value="" style={{ background: '#1e2430', color: '#e8eaf0' }}>Semua Bank</option>
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id} style={{ background: '#1e2430', color: '#e8eaf0' }}>
+                    {a.bank_name} — {a.account_number}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Reset */}
+            {hasActiveFilter && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high border border-outline-variant transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '0.95rem' }}>filter_alt_off</span>
+                Reset
+              </button>
+            )}
+          </div>
+
+          {/* Baris 2: Quick date + Tanggal range + info */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {/* Quick shortcuts */}
+            {(['week', 'month', 'year'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setQuickDate(p)}
+                className="px-3 py-1 rounded-lg text-xs font-medium transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(232,234,240,0.7)' }}
+              >
+                {p === 'week' ? 'Pekan Ini' : p === 'month' ? 'Bulan Ini' : 'Tahun Ini'}
+              </button>
+            ))}
+
+            {/* Tanggal dari */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>Dari</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
+              />
+            </div>
+
+            {/* Tanggal sampai */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>s/d</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => setDateTo(e.target.value)}
+                className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
+              />
+            </div>
+
+            {hasActiveFilter && (
+              <span className="text-xs text-on-surface-variant ml-1">
+                {filtered.length} dari {transactions.length} transaksi
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -545,12 +647,26 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
                 />
               </TableHeadCell>
             )}
-            <TableHeadCell>Tanggal</TableHeadCell>
+            <TableHeadCell>
+              <button onClick={() => toggleSort('tanggal')} className="flex items-center gap-1 hover:opacity-100 transition-opacity" style={{ opacity: sortField === 'tanggal' ? 1 : 0.7 }}>
+                Tanggal
+                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>
+                  {sortField === 'tanggal' ? (sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
+                </span>
+              </button>
+            </TableHeadCell>
             <TableHeadCell>No. Bukti</TableHeadCell>
             <TableHeadCell>Deskripsi</TableHeadCell>
             <TableHeadCell>Kategori</TableHeadCell>
             {isPenerimaan && <TableHeadCell>Rekening Bank</TableHeadCell>}
-            <TableHeadCell align="right">Nominal</TableHeadCell>
+            <TableHeadCell align="right">
+              <button onClick={() => toggleSort('nominal')} className="flex items-center gap-1 justify-end w-full hover:opacity-100 transition-opacity" style={{ opacity: sortField === 'nominal' ? 1 : 0.7 }}>
+                Nominal
+                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>
+                  {sortField === 'nominal' ? (sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
+                </span>
+              </button>
+            </TableHeadCell>
             <TableHeadCell align="center">Status</TableHeadCell>
             {showActions && <TableHeadCell align="center">Aksi</TableHeadCell>}
           </TableHead>

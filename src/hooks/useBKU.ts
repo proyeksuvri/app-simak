@@ -55,7 +55,10 @@ export function useBKU(type: BKUType, unitId?: string) {
         unitId:     r.work_unit_id,
         saldo,
         status:     r.status,
-        kategori:   r.kode_rekening,
+        kategori:        r.kode_rekening,
+        // IN = uang masuk ke destination_account; OUT = uang keluar dari source_account
+        sourceAccountId:   r.type === 'IN' ? r.destination_account_id : r.source_account_id,
+        jenisPendapatanId: r.jenis_pendapatan_id,
       }
     })
 

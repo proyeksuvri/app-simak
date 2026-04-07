@@ -23,12 +23,15 @@ export function formatRupiahSingkat(value: number): string {
 }
 
 // Format tanggal: 25 Jun 2024
+// Ambil hanya YYYY-MM-DD untuk menghindari shift timezone jika ada komponen waktu
 export function formatTanggal(isoDate: string): string {
+  const dateOnly = isoDate.slice(0, 10)
+  const [year, month, day] = dateOnly.split('-').map(Number)
   return new Intl.DateTimeFormat('id-ID', {
     day:   'numeric',
     month: 'short',
     year:  'numeric',
-  }).format(new Date(isoDate))
+  }).format(new Date(year, month - 1, day))
 }
 
 // Format tanggal panjang: Senin, 25 Juni 2024

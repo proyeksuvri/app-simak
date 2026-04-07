@@ -54,6 +54,22 @@ export function useManageBankAccounts() {
     return null
   }
 
+  async function updateAccount(id: string, input: BankAccountInput): Promise<string | null> {
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('accounts')
+      .update({
+        bank_name:      input.bank_name.trim(),
+        account_number: input.account_number.trim(),
+        account_name:   input.account_name.trim(),
+      })
+      .eq('id', id)
+    setSaving(false)
+    if (err) { setError(err.message); return err.message }
+    return null
+  }
+
   async function toggleActive(id: string, is_active: boolean): Promise<string | null> {
     setSaving(true)
     setError(null)
@@ -66,5 +82,17 @@ export function useManageBankAccounts() {
     return null
   }
 
-  return { createAccount, toggleActive, saving, error }
+  async function deleteAccount(id: string): Promise<string | null> {
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase
+      .from('accounts')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+    setSaving(false)
+    if (err) { setError(err.message); return err.message }
+    return null
+  }
+
+  return { createAccount, updateAccount, toggleActive, deleteAccount, saving, error }
 }

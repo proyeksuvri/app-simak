@@ -1,16 +1,64 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
 import { USER_ROLE_LABELS } from '../../types'
 import { SidebarNavItem } from './SidebarNavItem'
+
+function SidebarGroup({
+  label,
+  children,
+  defaultOpen = true,
+}: {
+  label: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="mt-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 mb-1 group"
+      >
+        <p
+          className="text-[0.58rem] font-semibold uppercase tracking-widest font-body transition-colors"
+          style={{ color: open ? 'rgba(232,234,240,0.5)' : 'rgba(232,234,240,0.3)' }}
+        >
+          {label}
+        </p>
+        <span
+          className="material-symbols-outlined transition-transform duration-200"
+          style={{
+            fontSize: '0.75rem',
+            color: 'rgba(232,234,240,0.25)',
+            transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
+            fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20",
+          }}
+        >
+          expand_more
+        </span>
+      </button>
+      {open && <div className="flex flex-col gap-0.5">{children}</div>}
+    </div>
+  )
+}
 
 export function Sidebar() {
   const { currentUser, signOut } = useAppContext()
   const navigate = useNavigate()
   const role = currentUser.role
 
+  const isBendaharaPenerimaan = role === 'bendahara_penerimaan'
+  const isBendaharaInduk      = role === 'bendahara_induk'
+  const isBendaharaPembantu   = role === 'bendahara_pembantu'
+  const isAdmin               = role === 'admin'
+  const isPimpinan            = role === 'pimpinan'
+
   return (
     <aside
-      className="w-52 flex-shrink-0 h-screen flex flex-col overflow-y-auto"
+      className="w-52 flex-shrink-0 h-screen flex flex-col overflow-y-auto scrollbar-hide"
+      style={{ scrollbarWidth: 'none' } as React.CSSProperties}
       style={{
         background: '#10131a',
         borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -34,70 +82,84 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 pb-4 flex flex-col gap-0.5">
+      <nav className="flex-1 px-3 pb-4 flex flex-col">
 
-        <SidebarNavItem to="/dashboard"       icon="dashboard"       label="Dashboard" />
+        {/* Beranda */}
+        <div className="flex flex-col gap-0.5 mt-1">
+          <SidebarNavItem to="/dashboard" icon="dashboard" label="Dashboard" />
+        </div>
 
-        {(role === 'bendahara_penerimaan' || role === 'bendahara_induk' || role === 'admin') && (
-          <>
-            {(role === 'bendahara_penerimaan' || role === 'admin') && (
-              <SidebarNavItem to="/penerimaan/bpn"     icon="receipt_long"    label="Penerimaan (BPN)" />
+        {/* Transaksi */}
+        {(isBendaharaPenerimaan || isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
+          <SidebarGroup label="Transaksi">
+            {(isBendaharaPenerimaan || isAdmin) && (
+              <SidebarNavItem to="/penerimaan/bpn"     icon="receipt_long"  label="Penerimaan (BPN)" />
             )}
-            {(role === 'bendahara_induk' || role === 'admin') && (
-              <SidebarNavItem to="/pengeluaran/bpk"    icon="payments"        label="Pengeluaran (BPK)" />
+            {(isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
+              <SidebarNavItem to="/pengeluaran/bpk"    icon="payments"      label="Pengeluaran (BPK)" />
             )}
-            {(role === 'bendahara_induk' || role === 'admin') && (
-              <SidebarNavItem to="/pengeluaran/up-tup" icon="request_quote"   label="Pengajuan UP/TUP" />
+            {(isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
+              <SidebarNavItem to="/pengeluaran/up-tup" icon="request_quote" label="Pengajuan UP/TUP" />
             )}
-          </>
+          </SidebarGroup>
         )}
 
-        {role === 'bendahara_pembantu' && (
-          <>
-            <SidebarNavItem to="/pengeluaran/bpk"    icon="payments"      label="Bukti Pengeluaran" />
-            <SidebarNavItem to="/pengeluaran/up-tup" icon="request_quote" label="Pengajuan UP/TUP" />
-          </>
+        {/* BKU Penerimaan */}
+        {(isBendaharaPenerimaan || isAdmin) && (
+          <SidebarGroup label="BKU Penerimaan">
+            <SidebarNavItem to="/bku/penerimaan"                icon="menu_book"       label="BKU Penerimaan" />
+            <SidebarNavItem to="/bku/pembantu-penerimaan"       icon="library_books"   label="Pembantu Penerimaan" />
+            <SidebarNavItem to="/bku/pembantu-rekening"         icon="account_balance" label="Pembantu Rekening" />
+            <SidebarNavItem to="/bku/pembantu-jenis-pendapatan" icon="category"        label="Pembantu Jenis" />
+          </SidebarGroup>
         )}
 
-        {(role === 'bendahara_penerimaan' || role === 'admin') && (
-          <SidebarNavItem to="/bku/penerimaan" icon="menu_book"     label="BKU Penerimaan" />
-        )}
-        {(role === 'bendahara_induk' || role === 'admin') && (
-          <SidebarNavItem to="/bku/induk"      icon="book"          label="BKU Induk" />
-        )}
-        {(role === 'bendahara_pembantu' || role === 'bendahara_induk' || role === 'admin') && (
-          <SidebarNavItem to="/bku/pembantu"   icon="library_books" label="BKU Pembantu" />
-        )}
-        {(role === 'bendahara_induk' || role === 'admin') && (
-          <SidebarNavItem to="/bku/penutupan"  icon="lock_clock"    label="Penutupan Harian" />
-        )}
-
-        {(role === 'bendahara_induk' || role === 'admin') && (
-          <>
-            <SidebarNavItem to="/rekonsiliasi"        icon="sync_alt"    label="Rekonsiliasi Bank" />
-            <SidebarNavItem to="/rekonsiliasi/opname" icon="balance"     label="Opname Kas" />
-          </>
+        {/* BKU Pengeluaran */}
+        {(isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
+          <SidebarGroup label="BKU Pengeluaran">
+            {(isBendaharaInduk || isAdmin) && (
+              <SidebarNavItem to="/bku/induk"     icon="book"          label="BKU Induk" />
+            )}
+            <SidebarNavItem to="/bku/pembantu"    icon="library_books" label="BKU Pembantu" />
+            {(isBendaharaInduk || isAdmin) && (
+              <SidebarNavItem to="/bku/penutupan" icon="lock_clock"    label="Penutupan Harian" />
+            )}
+          </SidebarGroup>
         )}
 
-        {(role === 'pimpinan' || role === 'admin') && (
-          <SidebarNavItem to="/approval" icon="fact_check" label="Persetujuan" />
+        {/* Rekonsiliasi */}
+        {(isBendaharaInduk || isAdmin) && (
+          <SidebarGroup label="Rekonsiliasi">
+            <SidebarNavItem to="/rekonsiliasi"        icon="sync_alt" label="Rekonsiliasi Bank" />
+            <SidebarNavItem to="/rekonsiliasi/opname" icon="balance"  label="Opname Kas" />
+          </SidebarGroup>
         )}
 
-        <SidebarNavItem to="/laporan" icon="summarize" label="Laporan" />
+        {/* Persetujuan */}
+        {(isPimpinan || isAdmin) && (
+          <SidebarGroup label="Persetujuan">
+            <SidebarNavItem to="/approval" icon="fact_check" label="Persetujuan" />
+          </SidebarGroup>
+        )}
 
-        {role === 'admin' ? (
-          <>
+        {/* Laporan & Admin */}
+        <SidebarGroup label="Laporan">
+          <SidebarNavItem to="/laporan" icon="summarize" label="Laporan" />
+        </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup label="Administrasi">
             <SidebarNavItem to="/pengaturan/users" icon="manage_accounts" label="Manajemen User" />
             <SidebarNavItem to="/pengaturan/units" icon="corporate_fare"  label="Unit Kerja" />
-          </>
-        ) : null}
+          </SidebarGroup>
+        )}
+
       </nav>
 
       {/* Bottom actions */}
       <div className="px-3 pb-4 flex flex-col gap-1 flex-shrink-0">
-        {/* New Allocation CTA */}
         <button
-          onClick={() => navigate(role === 'bendahara_penerimaan' ? '/penerimaan/bpn' : '/pengeluaran/bpk')}
+          onClick={() => navigate(isBendaharaPenerimaan ? '/penerimaan/bpn' : '/pengeluaran/bpk')}
           className="w-full py-2.5 rounded-xl text-xs font-semibold font-body text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90 active:opacity-75 mb-2"
           style={{ background: 'linear-gradient(135deg, #6C48D1, #9B6DFF)' }}
         >
