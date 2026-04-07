@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
+import { queryCache } from '../lib/queryCache'
 
 export interface TransactionInput {
   type:                'IN' | 'OUT'
@@ -69,6 +70,7 @@ export function useMutateTransaction() {
         setError(err.message)
         return false
       }
+      queryCache.invalidate('bku:')
       return true
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Terjadi kesalahan tidak terduga'
@@ -112,6 +114,7 @@ export function useMutateTransaction() {
         setError(err.message)
         return false
       }
+      queryCache.invalidate('bku:')
       return true
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Terjadi kesalahan tidak terduga'
@@ -132,6 +135,7 @@ export function useMutateTransaction() {
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
       if (err) { setError(err.message); return false }
+      queryCache.invalidate('bku:')
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Terjadi kesalahan')

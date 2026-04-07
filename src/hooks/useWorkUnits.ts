@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { DbWorkUnit } from '../types/database'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
+import { queryCache, TTL } from '../lib/queryCache'
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -12,7 +13,12 @@ export function useWorkUnits() {
 
   const tenantId = (currentUser as { tenantId?: string }).tenantId ?? TENANT_ID
 
-  const fetch = useCallback(() => {
+  const load = useCallback((force = false) => {
+    const cacheKey = `work_units:${tenantId}`
+    if (!force) {
+      const cached = queryCache.get<DbWorkUnit[]>(cacheKey)
+      if (cached) { setWorkUnits(cached); setLoading(false); return }
+    }
     setLoading(true)
     supabase
       .from('work_units')
@@ -21,14 +27,21 @@ export function useWorkUnits() {
       .is('deleted_at', null)
       .order('name')
       .then(({ data }) => {
-        setWorkUnits((data ?? []) as DbWorkUnit[])
+        const rows = (data ?? []) as DbWorkUnit[]
+        queryCache.set(cacheKey, rows, TTL.REFERENCE)
+        setWorkUnits(rows)
         setLoading(false)
       })
   }, [tenantId])
 
-  useEffect(() => { fetch() }, [fetch])
+  const refetch = useCallback(() => {
+    queryCache.invalidate('work_units:')
+    load(true)
+  }, [load])
 
-  return { workUnits, loading, refetch: fetch }
+  useEffect(() => { load() }, [load])
+
+  return { workUnits, loading, refetch }
 }
 
 export function useManageWorkUnits() {
@@ -45,6 +58,7 @@ export function useManageWorkUnits() {
       .insert({ tenant_id: tenantId, name: name.trim(), parent_id: parentId ?? null })
     setSaving(false)
     if (err) { setError(err.message); return err.message }
+    queryCache.invalidate('work_units:')
     return null
   }
 
@@ -56,6 +70,7 @@ export function useManageWorkUnits() {
       .eq('id', id)
     setSaving(false)
     if (err) { setError(err.message); return err.message }
+    queryCache.invalidate('work_units:')
     return null
   }
 
@@ -67,6 +82,7 @@ export function useManageWorkUnits() {
       .eq('id', id)
     setSaving(false)
     if (err) { setError(err.message); return err.message }
+    queryCache.invalidate('work_units:')
     return null
   }
 

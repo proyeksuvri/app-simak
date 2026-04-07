@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
+import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -14,8 +15,9 @@ export function BKUPembantuPenerimaanPage() {
   const { tahunAnggaran, currentUser } = useAppContext()
 
   const [activeKategori, setActiveKategori] = useState<string | null>(null)
+  const [page,           setPage]           = useState(1)
+  const [pageSize,       setPageSize]       = useState(10)
 
-  // Ambil kategori unik dari data DB (trim whitespace)
   const categories = useMemo(() => {
     const cats = entries
       .map(e => e.kategori?.trim())
@@ -23,7 +25,6 @@ export function BKUPembantuPenerimaanPage() {
     return [...new Set(cats)].sort()
   }, [entries])
 
-  // Auto-select kategori pertama setelah data loaded
   useEffect(() => {
     if (!activeKategori && categories.length > 0) {
       setActiveKategori(categories[0])
@@ -44,6 +45,20 @@ export function BKUPembantuPenerimaanPage() {
   const saldoAkhir = filteredEntries.length > 0
     ? filteredEntries[filteredEntries.length - 1].saldo
     : 0
+
+  // Reset ke halaman 1 saat kategori berubah
+  const handleKategoriChange = (kat: string) => {
+    setActiveKategori(kat)
+    setPage(1)
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
+  const safePage   = Math.min(page, totalPages)
+
+  const pagedEntries = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return filteredEntries.slice(start, start + pageSize)
+  }, [filteredEntries, safePage, pageSize])
 
   const handleCetak = () => {
     printBKU({
@@ -83,7 +98,7 @@ export function BKUPembantuPenerimaanPage() {
           categories.map(kat => (
             <button
               key={kat}
-              onClick={() => setActiveKategori(kat)}
+              onClick={() => handleKategoriChange(kat)}
               className={[
                 'px-3 py-1.5 rounded-xl text-xs font-medium font-body transition-colors',
                 activeKategori === kat
@@ -97,22 +112,31 @@ export function BKUPembantuPenerimaanPage() {
         )}
       </div>
 
-      {/* Summary Cards */}
       <BKUSummaryCards
         entries={filteredEntries}
         saldoAkhir={saldoAkhir}
         loading={loading}
       />
 
-      {/* Tabel Ledger */}
       <Card padding="sm">
         <BKULedger
           type="penerimaan"
-          entriesOverride={filteredEntries}
+          entriesOverride={pagedEntries}
           saldoAkhirOverride={saldoAkhir}
           loadingOverride={loading}
         />
       </Card>
+
+      {!loading && filteredEntries.length > 0 && (
+        <BKUPagination
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredEntries.length}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
+      )}
     </PageContainer>
   )
 }

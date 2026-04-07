@@ -1,5 +1,7 @@
+import { useMemo, useState } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
+import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -11,6 +13,17 @@ export function BKUIndukPage() {
   const { entries, saldoAkhir, loading } = useBKU('induk')
   const { printBKU, printing } = usePrintBKU()
   const { tahunAnggaran, currentUser } = useAppContext()
+
+  const [page,     setPage]     = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
+  const safePage   = Math.min(page, totalPages)
+
+  const pagedEntries = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return entries.slice(start, start + pageSize)
+  }, [entries, safePage, pageSize])
 
   const handleCetak = () => {
     printBKU({
@@ -40,9 +53,26 @@ export function BKUIndukPage() {
       }
     >
       <BKUSummaryCards entries={entries} saldoAkhir={saldoAkhir} loading={loading} />
+
       <Card padding="sm">
-        <BKULedger type="induk" />
+        <BKULedger
+          type="induk"
+          entriesOverride={pagedEntries}
+          saldoAkhirOverride={saldoAkhir}
+          loadingOverride={loading}
+        />
       </Card>
+
+      {!loading && entries.length > 0 && (
+        <BKUPagination
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={entries.length}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
+      )}
     </PageContainer>
   )
 }

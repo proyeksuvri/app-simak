@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { queryCache } from '../lib/queryCache'
 
 interface ApprovalActions {
   submitting: boolean
@@ -22,6 +23,7 @@ export function useApproval(): ApprovalActions {
     setSubmitting(true)
     try {
       const { error } = await supabase.rpc('submit_transaction', { tx_id: txId })
+      if (!error) queryCache.invalidate('bku:')
       return error ? error.message : null
     } finally {
       setSubmitting(false)
@@ -33,6 +35,7 @@ export function useApproval(): ApprovalActions {
     try {
       const { data, error } = await supabase.rpc('submit_transactions_bulk', { tx_ids: txIds })
       if (error) return { submitted: 0, skipped: txIds.length, error: error.message }
+      queryCache.invalidate('bku:')
       return { submitted: data.submitted, skipped: data.skipped, error: null }
     } finally {
       setSubmitting(false)
@@ -43,6 +46,7 @@ export function useApproval(): ApprovalActions {
     setApproving(true)
     try {
       const { error } = await supabase.rpc('approve_transaction', { tx_id: txId })
+      if (!error) queryCache.invalidate('bku:')
       return error ? error.message : null
     } finally {
       setApproving(false)
@@ -54,6 +58,7 @@ export function useApproval(): ApprovalActions {
     try {
       const { data, error } = await supabase.rpc('approve_transactions_bulk', { tx_ids: txIds })
       if (error) return { approved: 0, skipped: txIds.length, error: error.message }
+      queryCache.invalidate('bku:')
       return { approved: data.approved, skipped: data.skipped, error: null }
     } finally {
       setApproving(false)
@@ -64,6 +69,7 @@ export function useApproval(): ApprovalActions {
     setRejecting(true)
     try {
       const { error } = await supabase.rpc('reject_transaction', { tx_id: txId, note })
+      if (!error) queryCache.invalidate('bku:')
       return error ? error.message : null
     } finally {
       setRejecting(false)
@@ -75,6 +81,7 @@ export function useApproval(): ApprovalActions {
     try {
       const { data, error } = await supabase.rpc('reject_transactions_bulk', { tx_ids: txIds, note })
       if (error) return { rejected: 0, skipped: txIds.length, error: error.message }
+      queryCache.invalidate('bku:')
       return { rejected: data.rejected, skipped: data.skipped, error: null }
     } finally {
       setRejecting(false)

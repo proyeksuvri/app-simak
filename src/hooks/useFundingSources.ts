@@ -1,28 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { DbFundingSource } from '../types/database'
+import { queryCache, TTL } from '../lib/queryCache'
 
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
+const CACHE_KEY = 'funding_sources'
 
 export function useFundingSources() {
   const [fundingSources, setFundingSources] = useState<DbFundingSource[]>([])
   const [loading, setLoading]              = useState(true)
 
-  const fetch = () => {
+  const load = useCallback((force = false) => {
+    if (!force) {
+      const cached = queryCache.get<DbFundingSource[]>(CACHE_KEY)
+      if (cached) { setFundingSources(cached); setLoading(false); return }
+    }
+    setLoading(true)
     supabase
       .from('funding_sources')
       .select('id, tenant_id, name, kode_akun')
       .eq('tenant_id', TENANT_ID)
       .order('name')
       .then(({ data }) => {
-        setFundingSources((data ?? []) as DbFundingSource[])
+        const rows = (data ?? []) as DbFundingSource[]
+        queryCache.set(CACHE_KEY, rows, TTL.REFERENCE)
+        setFundingSources(rows)
         setLoading(false)
       })
-  }
+  }, [])
 
-  useEffect(() => { fetch() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const refetch = useCallback(() => {
+    queryCache.invalidate(CACHE_KEY)
+    load(true)
+  }, [load])
 
-  return { fundingSources, loading, refetch: fetch }
+  useEffect(() => { load() }, [load])
+
+  return { fundingSources, loading, refetch }
 }
 
 export function useManageFundingSources() {
@@ -39,6 +53,7 @@ export function useManageFundingSources() {
     })
     setSaving(false)
     if (err) { setError(err.message); return err.message }
+    queryCache.invalidate(CACHE_KEY)
     return null
   }
 
@@ -51,6 +66,7 @@ export function useManageFundingSources() {
       .eq('id', id)
     setSaving(false)
     if (err) { setError(err.message); return err.message }
+    queryCache.invalidate(CACHE_KEY)
     return null
   }
 
@@ -69,6 +85,7 @@ export function useManageFundingSources() {
       setError(msg)
       return msg
     }
+    queryCache.invalidate(CACHE_KEY)
     return null
   }
 

@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
+import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
@@ -18,31 +19,62 @@ export function BKUPembantuJenisPendapatanPage() {
   const { tahunAnggaran, currentUser } = useAppContext()
 
   const [activeId,      setActiveId]      = useState<string | null>(null)
-  const [activeAccount, setActiveAccount] = useState<string>('')  // '' = semua bank
-  const [pageSize,      setPageSize]      = useState<number>(20)
+  const [activeAccount, setActiveAccount] = useState<string>('')
+  const [activeBulan,   setActiveBulan]   = useState<number | null>(null)
+  const [page,          setPage]          = useState(1)
+  const [pageSize,      setPageSize]      = useState(10)
 
-  const activeFS = activeId ? fundingSources.find(f => f.id === activeId) : null
+  const NAMA_BULAN = [
+    'Januari','Februari','Maret','April','Mei','Juni',
+    'Juli','Agustus','September','Oktober','November','Desember',
+  ]
+
+  const loading = loadingEntries || loadingFS || loadingAccounts
+
+  const activeFS         = activeId ? fundingSources.find(f => f.id === activeId) : null
   const activeAccountObj = accounts.find(a => a.id === activeAccount)
+
+  // Reset halaman saat filter berubah
+  const handleJenisChange = (val: string) => {
+    setActiveId(val || null)
+    setActiveAccount('')
+    setPage(1)
+  }
+  const handleBankChange = (val: string) => {
+    setActiveAccount(val)
+    setPage(1)
+  }
+  const handleBulanChange = (val: string) => {
+    setActiveBulan(val === '' ? null : Number(val))
+    setPage(1)
+  }
 
   const filteredEntries = useMemo(() => {
     let saldo = 0
     return entries
       .filter(e => {
-        if (activeId && e.jenisPendapatanId !== activeId) return false
-        if (activeAccount && e.sourceAccountId !== activeAccount) return false
+        if (activeId      && e.jenisPendapatanId !== activeId)     return false
+        if (activeAccount && e.sourceAccountId   !== activeAccount) return false
+        if (activeBulan !== null && Number(e.tanggal.slice(5, 7)) !== activeBulan) return false
         return true
       })
       .map(e => {
         saldo = saldo + e.debit - e.kredit
         return { ...e, saldo }
       })
-  }, [entries, activeId, activeAccount])
+  }, [entries, activeId, activeAccount, activeBulan])
 
   const saldoAkhir = filteredEntries.length > 0
     ? filteredEntries[filteredEntries.length - 1].saldo
     : 0
 
-  const loading = loadingEntries || loadingFS || loadingAccounts
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
+  const safePage   = Math.min(page, totalPages)
+
+  const pagedEntries = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return filteredEntries.slice(start, start + pageSize)
+  }, [filteredEntries, safePage, pageSize])
 
   const cetakLabel = [
     activeFS ? activeFS.name : 'Semua Jenis Pendapatan',
@@ -77,35 +109,36 @@ export function BKUPembantuJenisPendapatanPage() {
         </Button>
       }
     >
-      {/* Jenis Pendapatan Selector */}
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs text-[#e8eaf0] font-body">Jenis Pendapatan:</span>
-        {loadingFS ? (
-          <span className="text-xs text-on-surface-variant font-body">Memuat...</span>
-        ) : (
-          <select
-            value={activeId ?? ''}
-            onChange={e => { setActiveId(e.target.value || null); setActiveAccount('') }}
-            className="px-3 py-2 rounded-xl text-sm bg-[#1e2430] border border-[#2a303c] text-[#e8eaf0] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer"
-          >
-            <option value="" style={{ background: '#1e2430' }}>Semua Jenis Pendapatan</option>
-            {fundingSources.map(fs => (
-              <option key={fs.id} value={fs.id} style={{ background: '#1e2430' }}>
-                {fs.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Filter Bank + Per Halaman */}
+      {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        {/* Jenis Pendapatan */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#e8eaf0] font-body whitespace-nowrap">Jenis Pendapatan:</span>
+          {loadingFS ? (
+            <span className="text-xs text-on-surface-variant font-body">Memuat...</span>
+          ) : (
+            <select
+              value={activeId ?? ''}
+              onChange={e => handleJenisChange(e.target.value)}
+              className="px-3 py-2 rounded-xl text-sm bg-[#1e2430] border border-[#2a303c] text-[#e8eaf0] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer"
+            >
+              <option value="" style={{ background: '#1e2430' }}>Semua Jenis Pendapatan</option>
+              {fundingSources.map(fs => (
+                <option key={fs.id} value={fs.id} style={{ background: '#1e2430' }}>
+                  {fs.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Bank */}
         {!loadingAccounts && accounts.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#e8eaf0] font-body">Bank:</span>
+            <span className="text-xs text-[#e8eaf0] font-body whitespace-nowrap">Bank:</span>
             <select
               value={activeAccount}
-              onChange={e => setActiveAccount(e.target.value)}
+              onChange={e => handleBankChange(e.target.value)}
               className="px-3 py-2 rounded-xl text-sm bg-[#1e2430] border border-[#2a303c] text-[#e8eaf0] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer"
             >
               <option value="" style={{ background: '#1e2430' }}>Semua Bank</option>
@@ -118,38 +151,49 @@ export function BKUPembantuJenisPendapatanPage() {
           </div>
         )}
 
-        {/* Per halaman */}
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-[#bfc8c4] font-body whitespace-nowrap">Baris per halaman:</span>
+        {/* Bulan */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#e8eaf0] font-body whitespace-nowrap">Bulan:</span>
           <select
-            value={pageSize}
-            onChange={e => setPageSize(Number(e.target.value))}
+            value={activeBulan ?? ''}
+            onChange={e => handleBulanChange(e.target.value)}
             className="px-3 py-2 rounded-xl text-sm bg-[#1e2430] border border-[#2a303c] text-[#e8eaf0] focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors cursor-pointer"
           >
-            {[10, 20, 50, 100].map(n => (
-              <option key={n} value={n} style={{ background: '#1e2430' }}>{n}</option>
+            <option value="" style={{ background: '#1e2430' }}>Semua Bulan</option>
+            {NAMA_BULAN.map((nama, idx) => (
+              <option key={idx + 1} value={idx + 1} style={{ background: '#1e2430' }}>
+                {nama}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Summary Cards */}
       <BKUSummaryCards
         entries={filteredEntries}
         saldoAkhir={saldoAkhir}
         loading={loading}
       />
 
-      {/* Tabel Ledger */}
       <Card padding="sm">
         <BKULedger
           type="penerimaan"
-          entriesOverride={filteredEntries}
+          entriesOverride={pagedEntries}
           saldoAkhirOverride={saldoAkhir}
           loadingOverride={loading}
-          pageSize={pageSize}
         />
       </Card>
+
+      {!loading && filteredEntries.length > 0 && (
+        <BKUPagination
+          page={safePage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredEntries.length}
+          onPage={setPage}
+          onPageSize={setPageSize}
+        />
+      )}
     </PageContainer>
   )
 }
