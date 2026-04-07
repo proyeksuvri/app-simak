@@ -1,50 +1,45 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
 import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { useBKU } from '../../hooks/useBKU'
+import { useBKUPage, fetchAllBKUEntries } from '../../hooks/useBKUPage'
 import { usePrintBKU } from '../../hooks/usePrintBKU'
 import { useWorkUnits } from '../../hooks/useWorkUnits'
 import { useAppContext } from '../../context/AppContext'
 
 export function BKUPembantuPage() {
+  const { tahunAnggaran, currentUser } = useAppContext()
   const { workUnits, loading: loadingUnits } = useWorkUnits()
+  const { printBKU, printing } = usePrintBKU()
+
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null)
+  const [page,         setPage]         = useState(1)
+  const [pageSize,     setPageSize]     = useState(10)
 
   const activeUnit = selectedUnit ?? workUnits[0]?.id ?? null
 
-  const { entries, saldoAkhir, loading: loadingBKU } = useBKU('pembantu', activeUnit ?? undefined)
-  const { printBKU, printing } = usePrintBKU()
-  const { tahunAnggaran, currentUser } = useAppContext()
-
-  const [page,     setPage]     = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const { entries, saldoAkhir, total, totalPages, loading: loadingBKU } =
+    useBKUPage('pembantu', page, pageSize, { unitId: activeUnit })
 
   const loading = loadingUnits || loadingBKU
 
-  // Reset halaman saat unit berubah
   const handleSelectUnit = (id: string) => {
     setSelectedUnit(id)
     setPage(1)
   }
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
-
-  const pagedEntries = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return entries.slice(start, start + pageSize)
-  }, [entries, safePage, pageSize])
-
   const activeUnitName = workUnits.find(u => u.id === activeUnit)?.name ?? 'UIN Palopo'
 
-  const handleCetak = () => {
+  const handleCetak = async () => {
+    const { entries: all, saldoAkhir: sa } = await fetchAllBKUEntries(
+      'pembantu', tahunAnggaran, { unitId: activeUnit }
+    )
     printBKU({
-      entries,
-      saldoAkhir,
+      entries:       all,
+      saldoAkhir:    sa,
       tahunAnggaran,
       namaUnit:      activeUnitName,
       namaBendahara: currentUser.nama,
@@ -62,7 +57,7 @@ export function BKUPembantuPage() {
           variant="secondary"
           size="sm"
           onClick={handleCetak}
-          disabled={loading || printing || entries.length === 0}
+          disabled={loading || printing || total === 0}
         >
           {printing ? 'Menyiapkan PDF...' : 'Cetak BKU'}
         </Button>
@@ -96,7 +91,7 @@ export function BKUPembantuPage() {
         {activeUnit ? (
           <BKULedger
             type="pembantu"
-            entriesOverride={pagedEntries}
+            entriesOverride={entries}
             saldoAkhirOverride={saldoAkhir}
             loadingOverride={loading}
           />
@@ -107,14 +102,14 @@ export function BKUPembantuPage() {
         )}
       </Card>
 
-      {!loading && activeUnit && entries.length > 0 && (
+      {!loading && activeUnit && total > 0 && (
         <BKUPagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           pageSize={pageSize}
-          totalItems={entries.length}
-          onPage={setPage}
-          onPageSize={setPageSize}
+          totalItems={total}
+          onPage={p => setPage(p)}
+          onPageSize={s => { setPageSize(s); setPage(1) }}
         />
       )}
     </PageContainer>

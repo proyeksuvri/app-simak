@@ -1,22 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
 import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { useBKU } from '../../hooks/useBKU'
+import { useBKUPage, fetchAllBKUEntries } from '../../hooks/useBKUPage'
 import { usePrintBKU } from '../../hooks/usePrintBKU'
 import { useFundingSources } from '../../hooks/useFundingSources'
 import { useBankAccounts } from '../../hooks/useBankAccounts'
 import { useAppContext } from '../../context/AppContext'
 
+const NAMA_BULAN = [
+  'Januari','Februari','Maret','April','Mei','Juni',
+  'Juli','Agustus','September','Oktober','November','Desember',
+]
+
 export function BKUPembantuJenisPendapatanPage() {
-  const { entries, loading: loadingEntries } = useBKU('penerimaan')
+  const { tahunAnggaran, currentUser } = useAppContext()
   const { fundingSources, loading: loadingFS } = useFundingSources()
   const { accounts, loading: loadingAccounts } = useBankAccounts(true)
   const { printBKU, printing } = usePrintBKU()
-  const { tahunAnggaran, currentUser } = useAppContext()
 
   const [activeId,      setActiveId]      = useState<string | null>(null)
   const [activeAccount, setActiveAccount] = useState<string>('')
@@ -24,67 +28,42 @@ export function BKUPembantuJenisPendapatanPage() {
   const [page,          setPage]          = useState(1)
   const [pageSize,      setPageSize]      = useState(10)
 
-  const NAMA_BULAN = [
-    'Januari','Februari','Maret','April','Mei','Juni',
-    'Juli','Agustus','September','Oktober','November','Desember',
-  ]
-
-  const loading = loadingEntries || loadingFS || loadingAccounts
-
-  const activeFS         = activeId ? fundingSources.find(f => f.id === activeId) : null
-  const activeAccountObj = accounts.find(a => a.id === activeAccount)
-
-  // Reset halaman saat filter berubah
-  const handleJenisChange = (val: string) => {
-    setActiveId(val || null)
-    setActiveAccount('')
-    setPage(1)
-  }
-  const handleBankChange = (val: string) => {
-    setActiveAccount(val)
-    setPage(1)
-  }
+  const handleJenisChange = (val: string) => { setActiveId(val || null); setPage(1) }
+  const handleBankChange  = (val: string) => { setActiveAccount(val);    setPage(1) }
   const handleBulanChange = (val: string) => {
     setActiveBulan(val === '' ? null : Number(val))
     setPage(1)
   }
 
-  const filteredEntries = useMemo(() => {
-    let saldo = 0
-    return entries
-      .filter(e => {
-        if (activeId      && e.jenisPendapatanId !== activeId)     return false
-        if (activeAccount && e.sourceAccountId   !== activeAccount) return false
-        if (activeBulan !== null && Number(e.tanggal.slice(5, 7)) !== activeBulan) return false
-        return true
-      })
-      .map(e => {
-        saldo = saldo + e.debit - e.kredit
-        return { ...e, saldo }
-      })
-  }, [entries, activeId, activeAccount, activeBulan])
+  const { entries, saldoAkhir, total, totalPages, loading: loadingBKU } =
+    useBKUPage('penerimaan', page, pageSize, {
+      jenisPendapatanId: activeId,
+      accountId:         activeAccount || null,
+      bulan:             activeBulan,
+    })
 
-  const saldoAkhir = filteredEntries.length > 0
-    ? filteredEntries[filteredEntries.length - 1].saldo
-    : 0
+  const loading = loadingBKU || loadingFS || loadingAccounts
 
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
-
-  const pagedEntries = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return filteredEntries.slice(start, start + pageSize)
-  }, [filteredEntries, safePage, pageSize])
+  const activeFS         = activeId      ? fundingSources.find(f => f.id === activeId) : null
+  const activeAccountObj = activeAccount ? accounts.find(a => a.id === activeAccount)  : null
 
   const cetakLabel = [
     activeFS ? activeFS.name : 'Semua Jenis Pendapatan',
     activeAccountObj ? `${activeAccountObj.bank_name} (${activeAccountObj.account_number})` : null,
+    activeBulan      ? NAMA_BULAN[activeBulan - 1] : null,
   ].filter(Boolean).join(' — ')
 
-  const handleCetak = () => {
+  const handleCetak = async () => {
+    const { entries: all, saldoAkhir: sa } = await fetchAllBKUEntries(
+      'penerimaan', tahunAnggaran, {
+        jenisPendapatanId: activeId,
+        accountId:         activeAccount || null,
+        bulan:             activeBulan,
+      }
+    )
     printBKU({
-      entries:          filteredEntries,
-      saldoAkhir,
+      entries:          all,
+      saldoAkhir:       sa,
       tahunAnggaran,
       namaUnit:         'UIN Palopo',
       namaBendahara:    currentUser.nama,
@@ -103,7 +82,7 @@ export function BKUPembantuJenisPendapatanPage() {
           variant="secondary"
           size="sm"
           onClick={handleCetak}
-          disabled={loading || printing || filteredEntries.length === 0}
+          disabled={loading || printing || total === 0}
         >
           {printing ? 'Menyiapkan PDF...' : 'Cetak Pembantu'}
         </Button>
@@ -170,7 +149,7 @@ export function BKUPembantuJenisPendapatanPage() {
       </div>
 
       <BKUSummaryCards
-        entries={filteredEntries}
+        entries={entries}
         saldoAkhir={saldoAkhir}
         loading={loading}
       />
@@ -178,20 +157,20 @@ export function BKUPembantuJenisPendapatanPage() {
       <Card padding="sm">
         <BKULedger
           type="penerimaan"
-          entriesOverride={pagedEntries}
+          entriesOverride={entries}
           saldoAkhirOverride={saldoAkhir}
           loadingOverride={loading}
         />
       </Card>
 
-      {!loading && filteredEntries.length > 0 && (
+      {!loading && total > 0 && (
         <BKUPagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           pageSize={pageSize}
-          totalItems={filteredEntries.length}
-          onPage={setPage}
-          onPageSize={setPageSize}
+          totalItems={total}
+          onPage={p => setPage(p)}
+          onPageSize={s => { setPageSize(s); setPage(1) }}
         />
       )}
     </PageContainer>

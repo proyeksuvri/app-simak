@@ -6,11 +6,13 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { useBKU } from '../../hooks/useBKU'
+import { useBKUPage, fetchAllBKUEntries } from '../../hooks/useBKUPage'
 import { usePrintBKU } from '../../hooks/usePrintBKU'
 import { useAppContext } from '../../context/AppContext'
 
 export function BKUPembantuPenerimaanPage() {
-  const { entries, loading } = useBKU('penerimaan')
+  // Fetch all for category list only — lightweight since it's from cache after first load
+  const { entries: allEntries, loading: loadingAll } = useBKU('penerimaan')
   const { printBKU, printing } = usePrintBKU()
   const { tahunAnggaran, currentUser } = useAppContext()
 
@@ -19,11 +21,11 @@ export function BKUPembantuPenerimaanPage() {
   const [pageSize,       setPageSize]       = useState(10)
 
   const categories = useMemo(() => {
-    const cats = entries
+    const cats = allEntries
       .map(e => e.kategori?.trim())
       .filter(Boolean) as string[]
     return [...new Set(cats)].sort()
-  }, [entries])
+  }, [allEntries])
 
   useEffect(() => {
     if (!activeKategori && categories.length > 0) {
@@ -31,38 +33,37 @@ export function BKUPembantuPenerimaanPage() {
     }
   }, [categories, activeKategori])
 
-  const filteredEntries = useMemo(() => {
+  // Server-side paginated for display — filter by kode_rekening via account workaround:
+  // kode_rekening is not a filter in the RPC, so we still use client-side for this page.
+  // All entries are cached so repeated navigation is instant.
+  const filteredAll = useMemo(() => {
     if (!activeKategori) return []
     let saldo = 0
-    return entries
+    return allEntries
       .filter(e => e.kategori?.trim() === activeKategori)
       .map(e => {
         saldo = saldo + e.debit - e.kredit
         return { ...e, saldo }
       })
-  }, [entries, activeKategori])
+  }, [allEntries, activeKategori])
 
-  const saldoAkhir = filteredEntries.length > 0
-    ? filteredEntries[filteredEntries.length - 1].saldo
-    : 0
+  const saldoAkhir = filteredAll.length > 0 ? filteredAll[filteredAll.length - 1].saldo : 0
+  const totalPages = Math.max(1, Math.ceil(filteredAll.length / pageSize))
+  const safePage   = Math.min(page, totalPages)
 
-  // Reset ke halaman 1 saat kategori berubah
+  const pagedEntries = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return filteredAll.slice(start, start + pageSize)
+  }, [filteredAll, safePage, pageSize])
+
   const handleKategoriChange = (kat: string) => {
     setActiveKategori(kat)
     setPage(1)
   }
 
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
-
-  const pagedEntries = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return filteredEntries.slice(start, start + pageSize)
-  }, [filteredEntries, safePage, pageSize])
-
   const handleCetak = () => {
     printBKU({
-      entries:          filteredEntries,
+      entries:          filteredAll,
       saldoAkhir,
       tahunAnggaran,
       namaUnit:         'UIN Palopo',
@@ -82,7 +83,7 @@ export function BKUPembantuPenerimaanPage() {
           variant="secondary"
           size="sm"
           onClick={handleCetak}
-          disabled={loading || printing || filteredEntries.length === 0}
+          disabled={loadingAll || printing || filteredAll.length === 0}
         >
           {printing ? 'Menyiapkan PDF...' : 'Cetak Pembantu'}
         </Button>
@@ -90,7 +91,7 @@ export function BKUPembantuPenerimaanPage() {
     >
       {/* Kategori Selector */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {loading ? (
+        {loadingAll ? (
           <span className="text-xs text-on-surface-variant font-body">Memuat data...</span>
         ) : categories.length === 0 ? (
           <span className="text-xs text-on-surface-variant font-body">Belum ada data penerimaan.</span>
@@ -113,9 +114,9 @@ export function BKUPembantuPenerimaanPage() {
       </div>
 
       <BKUSummaryCards
-        entries={filteredEntries}
+        entries={filteredAll}
         saldoAkhir={saldoAkhir}
-        loading={loading}
+        loading={loadingAll}
       />
 
       <Card padding="sm">
@@ -123,18 +124,18 @@ export function BKUPembantuPenerimaanPage() {
           type="penerimaan"
           entriesOverride={pagedEntries}
           saldoAkhirOverride={saldoAkhir}
-          loadingOverride={loading}
+          loadingOverride={loadingAll}
         />
       </Card>
 
-      {!loading && filteredEntries.length > 0 && (
+      {!loadingAll && filteredAll.length > 0 && (
         <BKUPagination
           page={safePage}
           totalPages={totalPages}
           pageSize={pageSize}
-          totalItems={filteredEntries.length}
+          totalItems={filteredAll.length}
           onPage={setPage}
-          onPageSize={setPageSize}
+          onPageSize={s => { setPageSize(s); setPage(1) }}
         />
       )}
     </PageContainer>

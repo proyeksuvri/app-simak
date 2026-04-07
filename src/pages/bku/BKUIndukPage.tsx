@@ -1,34 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
 import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { useBKU } from '../../hooks/useBKU'
+import { useBKUPage, fetchAllBKUEntries } from '../../hooks/useBKUPage'
 import { usePrintBKU } from '../../hooks/usePrintBKU'
 import { useAppContext } from '../../context/AppContext'
 
 export function BKUIndukPage() {
-  const { entries, saldoAkhir, loading } = useBKU('induk')
-  const { printBKU, printing } = usePrintBKU()
   const { tahunAnggaran, currentUser } = useAppContext()
+  const { printBKU, printing } = usePrintBKU()
 
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
+  const { entries, saldoAkhir, total, totalPages, loading } =
+    useBKUPage('induk', page, pageSize)
 
-  const pagedEntries = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return entries.slice(start, start + pageSize)
-  }, [entries, safePage, pageSize])
-
-  const handleCetak = () => {
+  const handleCetak = async () => {
+    const { entries: all, saldoAkhir: sa } = await fetchAllBKUEntries('induk', tahunAnggaran)
     printBKU({
-      entries,
-      saldoAkhir,
+      entries:       all,
+      saldoAkhir:    sa,
       tahunAnggaran,
       namaUnit:      'UIN Palopo',
       namaBendahara: currentUser.nama,
@@ -46,7 +41,7 @@ export function BKUIndukPage() {
           variant="secondary"
           size="sm"
           onClick={handleCetak}
-          disabled={loading || printing || entries.length === 0}
+          disabled={loading || printing || total === 0}
         >
           {printing ? 'Menyiapkan PDF...' : 'Cetak BKU'}
         </Button>
@@ -57,20 +52,20 @@ export function BKUIndukPage() {
       <Card padding="sm">
         <BKULedger
           type="induk"
-          entriesOverride={pagedEntries}
+          entriesOverride={entries}
           saldoAkhirOverride={saldoAkhir}
           loadingOverride={loading}
         />
       </Card>
 
-      {!loading && entries.length > 0 && (
+      {!loading && total > 0 && (
         <BKUPagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           pageSize={pageSize}
-          totalItems={entries.length}
-          onPage={setPage}
-          onPageSize={setPageSize}
+          totalItems={total}
+          onPage={p => setPage(p)}
+          onPageSize={s => { setPageSize(s); setPage(1) }}
         />
       )}
     </PageContainer>

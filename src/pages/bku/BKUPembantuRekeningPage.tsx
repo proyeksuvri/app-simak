@@ -1,20 +1,19 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { BKULedger } from '../../components/domain/BKULedger'
 import { BKUSummaryCards } from '../../components/domain/BKUSummaryCards'
 import { BKUPagination } from '../../components/domain/BKUPagination'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { PageContainer } from '../../components/layout/PageContainer'
-import { useBKU } from '../../hooks/useBKU'
+import { useBKUPage, fetchAllBKUEntries } from '../../hooks/useBKUPage'
 import { usePrintBKU } from '../../hooks/usePrintBKU'
 import { useBankAccounts } from '../../hooks/useBankAccounts'
 import { useAppContext } from '../../context/AppContext'
 
 export function BKUPembantuRekeningPage() {
-  const { entries, loading: loadingEntries } = useBKU('penerimaan')
+  const { tahunAnggaran, currentUser } = useAppContext()
   const { accounts, loading: loadingAccounts } = useBankAccounts(true)
   const { printBKU, printing } = usePrintBKU()
-  const { tahunAnggaran, currentUser } = useAppContext()
 
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
   const [page,            setPage]            = useState(1)
@@ -27,45 +26,28 @@ export function BKUPembantuRekeningPage() {
   }, [accounts, activeAccountId])
 
   const activeAccount = accounts.find(a => a.id === activeAccountId)
-  const loading = loadingEntries || loadingAccounts
 
-  // Reset halaman saat rekening berubah
+  const { entries, saldoAkhir, total, totalPages, loading: loadingBKU } =
+    useBKUPage('penerimaan', page, pageSize, { accountId: activeAccountId })
+
+  const loading = loadingAccounts || loadingBKU
+
   const handleSelectAccount = (id: string) => {
     setActiveAccountId(id)
     setPage(1)
   }
 
-  const filteredEntries = useMemo(() => {
-    if (!activeAccountId) return []
-    let saldo = 0
-    return entries
-      .filter(e => e.sourceAccountId === activeAccountId)
-      .map(e => {
-        saldo = saldo + e.debit - e.kredit
-        return { ...e, saldo }
-      })
-  }, [entries, activeAccountId])
-
-  const saldoAkhir = filteredEntries.length > 0
-    ? filteredEntries[filteredEntries.length - 1].saldo
-    : 0
-
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize))
-  const safePage   = Math.min(page, totalPages)
-
-  const pagedEntries = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return filteredEntries.slice(start, start + pageSize)
-  }, [filteredEntries, safePage, pageSize])
-
   const pageTitle = activeAccount
     ? `BKU Pembantu: ${activeAccount.bank_name} - ${activeAccount.account_number}`
     : 'BKU Pembantu Rekening'
 
-  const handleCetak = () => {
+  const handleCetak = async () => {
+    const { entries: all, saldoAkhir: sa } = await fetchAllBKUEntries(
+      'penerimaan', tahunAnggaran, { accountId: activeAccountId }
+    )
     printBKU({
-      entries:          filteredEntries,
-      saldoAkhir,
+      entries:          all,
+      saldoAkhir:       sa,
       tahunAnggaran,
       namaUnit:         'UIN Palopo',
       namaBendahara:    currentUser.nama,
@@ -86,7 +68,7 @@ export function BKUPembantuRekeningPage() {
           variant="secondary"
           size="sm"
           onClick={handleCetak}
-          disabled={loading || printing || filteredEntries.length === 0}
+          disabled={loading || printing || total === 0}
         >
           {printing ? 'Menyiapkan PDF...' : 'Cetak Pembantu'}
         </Button>
@@ -118,7 +100,7 @@ export function BKUPembantuRekeningPage() {
       </div>
 
       <BKUSummaryCards
-        entries={filteredEntries}
+        entries={entries}
         saldoAkhir={saldoAkhir}
         loading={loading}
       />
@@ -127,7 +109,7 @@ export function BKUPembantuRekeningPage() {
         {activeAccountId ? (
           <BKULedger
             type="penerimaan"
-            entriesOverride={pagedEntries}
+            entriesOverride={entries}
             saldoAkhirOverride={saldoAkhir}
             loadingOverride={loading}
           />
@@ -138,14 +120,14 @@ export function BKUPembantuRekeningPage() {
         )}
       </Card>
 
-      {!loading && activeAccountId && filteredEntries.length > 0 && (
+      {!loading && activeAccountId && total > 0 && (
         <BKUPagination
-          page={safePage}
+          page={page}
           totalPages={totalPages}
           pageSize={pageSize}
-          totalItems={filteredEntries.length}
-          onPage={setPage}
-          onPageSize={setPageSize}
+          totalItems={total}
+          onPage={p => setPage(p)}
+          onPageSize={s => { setPageSize(s); setPage(1) }}
         />
       )}
     </PageContainer>
