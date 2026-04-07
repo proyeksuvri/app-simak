@@ -37,9 +37,10 @@ interface RpcRow {
 }
 
 interface RpcResult {
-  total:       number
-  saldo_akhir: number
-  rows:        RpcRow[]
+  total:        number
+  saldo_akhir:  number
+  total_debit:  number
+  rows:         RpcRow[]
 }
 
 function mapRow(r: RpcRow, bkuType: BKUType): BKUEntryWithSaldo {
@@ -69,6 +70,7 @@ export function useBKUPage(
   const { tahunAnggaran } = useAppContext()
   const [entries,    setEntries]    = useState<BKUEntryWithSaldo[]>([])
   const [saldoAkhir, setSaldoAkhir] = useState(0)
+  const [totalDebit, setTotalDebit] = useState(0)
   const [total,      setTotal]      = useState(0)
   const [loading,    setLoading]    = useState(true)
 
@@ -96,6 +98,7 @@ export function useBKUPage(
     const result = data as RpcResult
     setTotal(result.total ?? 0)
     setSaldoAkhir(Number(result.saldo_akhir ?? 0))
+    setTotalDebit(Number(result.total_debit ?? 0))
     setEntries((result.rows ?? []).map(r => mapRow(r, type)))
     setLoading(false)
   }, [type, tahunAnggaran, page, pageSize, unitId, accountId, bulan, jenisPendapatanId])
@@ -104,7 +107,7 @@ export function useBKUPage(
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
-  return { entries, saldoAkhir, total, totalPages, loading }
+  return { entries, saldoAkhir, totalDebit, total, totalPages, loading }
 }
 
 /**

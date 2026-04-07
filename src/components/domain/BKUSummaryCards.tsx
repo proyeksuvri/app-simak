@@ -3,9 +3,10 @@ import type { BKUEntryWithSaldo } from '../../types'
 import { formatRupiah } from '../../lib/formatters'
 
 interface BKUSummaryCardsProps {
-  entries:    BKUEntryWithSaldo[]
-  saldoAkhir: number
-  loading:    boolean
+  entries:     BKUEntryWithSaldo[]
+  saldoAkhir:  number
+  loading:     boolean
+  totalDebit?: number  // sum of all debit across all pages (from RPC); falls back to entries sum
 }
 
 interface SummaryCardItemProps {
@@ -103,9 +104,10 @@ function SummaryCardItem({ icon, label, value, subtitle, accent = 'purple', load
   )
 }
 
-export function BKUSummaryCards({ entries, saldoAkhir, loading }: BKUSummaryCardsProps) {
+export function BKUSummaryCards({ entries, saldoAkhir, loading, totalDebit }: BKUSummaryCardsProps) {
   const stats = useMemo(() => {
-    const totalPenerimaan = entries.reduce((sum, e) => sum + e.debit, 0)
+    const pageDebitSum    = entries.reduce((sum, e) => sum + e.debit, 0)
+    const totalPenerimaan = totalDebit ?? pageDebitSum
     const jumlahTransaksi = entries.filter(e => e.debit > 0).length
 
     // Penerimaan hari ini
@@ -115,7 +117,7 @@ export function BKUSummaryCards({ entries, saldoAkhir, loading }: BKUSummaryCard
       .reduce((sum, e) => sum + e.debit, 0)
 
     return { totalPenerimaan, jumlahTransaksi, penerimaanHariIni }
-  }, [entries])
+  }, [entries, totalDebit])
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
