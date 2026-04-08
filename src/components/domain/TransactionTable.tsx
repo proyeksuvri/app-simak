@@ -9,7 +9,7 @@ import { EmptyState } from '../ui/EmptyState'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { formatRupiah, formatTanggal } from '../../lib/formatters'
-import { useTransactions } from '../../hooks/useTransactions'
+import { useTransactionsPaged } from '../../hooks/useTransactionsPaged'
 import { useApproval } from '../../hooks/useApproval'
 import { useMutateTransaction } from '../../hooks/useMutateTransaction'
 import { useAppContext } from '../../context/AppContext'
@@ -92,10 +92,8 @@ function Toast({ message, type, onDone }: ToastProps) {
 
 export function TransactionTable({ filterType, filterStatus, filterUnitId, filterKategori, filterKategoriList, limit, onMutated }: TransactionTableProps) {
   const { currentUser } = useAppContext()
-  const { transactions, refetch } = useTransactions({ type: filterType, status: filterStatus, unitId: filterUnitId })
   const approval = useApproval()
   const { accounts } = useBankAccounts(false)
-
   const { deleteTransaction, saving: deleting } = useMutateTransaction()
 
   const [rejectTarget,   setRejectTarget]   = useState<string | null>(null)
@@ -122,8 +120,6 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
   // ── Filter lokal ────────────────────────────────────────────────────────────
   const [searchText,        setSearchText]        = useState('')
   const [filterStatusLocal, setFilterStatusLocal] = useState<Transaction['status'] | ''>('')
-  const [dateFrom,          setDateFrom]          = useState('')
-  const [dateTo,            setDateTo]            = useState('')
   const [filterMonth,       setFilterMonth]       = useState('')
   const [filterAccountId,   setFilterAccountId]   = useState('')
   const [sortField,         setSortField]         = useState<'tanggal' | 'nominal' | null>(null)
@@ -131,94 +127,38 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
   function toggleSort(field: 'tanggal' | 'nominal') {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('asc') }
+    else { setSortField(field); setSortDir('desc') }
   }
 
-  function setQuickDate(period: 'week' | 'month' | 'year') {
-    const today = new Date()
-    if (period === 'week') {
-      const day = today.getDay() || 7
-      const mon = new Date(today); mon.setDate(today.getDate() - day + 1)
-      const sun = new Date(mon);   sun.setDate(mon.getDate() + 6)
-      setDateFrom(mon.toISOString().slice(0, 10))
-      setDateTo(sun.toISOString().slice(0, 10))
-    } else if (period === 'month') {
-      const y = today.getFullYear(), m = today.getMonth()
-      setDateFrom(new Date(y, m, 1).toISOString().slice(0, 10))
-      setDateTo(new Date(y, m + 1, 0).toISOString().slice(0, 10))
-    } else {
-      const y = today.getFullYear()
-      setDateFrom(`${y}-01-01`)
-      setDateTo(`${y}-12-31`)
-    }
-  }
-
-  // ── Paginasi ────────────────────────────────────────────────────────────────
+  // ── Paginasi server-side ─────────────────────────────────────────────────────
   const [page,     setPage]     = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
 
-  const filtered = useMemo(() => {
-    let result = filterKategoriList
-      ? transactions.filter(t => filterKategoriList.includes(t.kategori))
-      : filterKategori
-        ? transactions.filter(t => t.kategori === filterKategori)
-        : transactions
+  // Reset ke halaman 1 saat filter berubah
+  useEffect(() => {
+    setPage(1)
+  }, [filterType, filterStatus, filterUnitId, filterKategori, pageSize, searchText, filterStatusLocal, filterMonth, filterAccountId])
 
-    if (searchText.trim()) {
-      const q = searchText.trim().toLowerCase()
-      result = result.filter(t =>
-        t.deskripsi.toLowerCase().includes(q) ||
-        t.nomorBukti.toLowerCase().includes(q)
-      )
-    }
-
-    if (filterStatusLocal) {
-      result = result.filter(t => t.status === filterStatusLocal)
-    }
-
-    if (dateFrom) result = result.filter(t => t.tanggal >= dateFrom)
-    if (dateTo)   result = result.filter(t => t.tanggal <= dateTo)
-
-    if (filterMonth)     result = result.filter(t => t.tanggal.slice(5, 7) === filterMonth)
-    if (filterAccountId) result = result.filter(t => t.destinationAccountId === filterAccountId)
-
-    if (sortField) {
-      result = [...result].sort((a, b) => {
-        const v = sortField === 'tanggal'
-          ? a.tanggal.localeCompare(b.tanggal)
-          : a.nominal - b.nominal
-        return sortDir === 'asc' ? v : -v
-      })
-    }
-
-    return result
-  }, [transactions, filterKategori, searchText, filterStatusLocal, dateFrom, dateTo, filterMonth, filterAccountId, sortField, sortDir])
-
-  // ── Summary stats (mengikuti filter aktif) ────────────────────────────────
-  const stats = useMemo(() => ({
-    totalNominal:   filtered.filter(t => t.status === 'terverifikasi').reduce((s, t) => s + t.nominal, 0),
-    countDraft:     filtered.filter(t => t.status === 'pending').length,
-    countDiajukan:  filtered.filter(t => t.status === 'diajukan').length,
-    countVerified:  filtered.filter(t => t.status === 'terverifikasi').length,
-    missingAccount: filtered.filter(t => t.type === 'penerimaan' && !t.destinationAccountId).length,
-  }), [filtered])
+  // ── Server-side paged query ──────────────────────────────────────────────────
+  const { rows, total: totalRows, stats, loading, refetch } = useTransactionsPaged({
+    type:            filterType,
+    propStatus:      filterStatus,
+    unitId:          filterUnitId,
+    filterStatus:    filterStatusLocal,
+    filterMonth,
+    filterAccountId,
+    searchText,
+    kategori:        filterKategori,
+    kategoriList:    filterKategoriList,
+    sortField,
+    sortDir,
+    page:            limit ? 1 : page,
+    pageSize:        limit ?? pageSize,
+  })
 
   // Jika prop limit dipakai (mode ringkasan), tidak pakai paginasi
   const usePagination = !limit
-  const totalRows  = filtered.length
   const totalPages = usePagination ? Math.max(1, Math.ceil(totalRows / pageSize)) : 1
-
-  // Reset ke halaman 1 jika filter berubah
-  useEffect(() => {
-    setPage(1)
-  }, [filterType, filterStatus, filterUnitId, filterKategori, pageSize, searchText, filterStatusLocal, dateFrom, dateTo, filterMonth, filterAccountId])
-
-  const rows = useMemo(() => {
-    if (!usePagination) return filtered.slice(0, limit)
-    const start = (page - 1) * pageSize
-    return filtered.slice(start, start + pageSize)
-  }, [filtered, page, pageSize, usePagination, limit])
-
   const startIndex = usePagination ? (page - 1) * pageSize + 1 : 1
   const endIndex   = usePagination ? Math.min(page * pageSize, totalRows) : rows.length
 
@@ -228,19 +168,19 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
   const showActions = isBendahara || canApprove
   const isPenerimaan = filterType === 'penerimaan'
 
-  // Rows eligible for selection
+  // Rows eligible for selection (hanya dari halaman saat ini)
   const selectableIds = isBendahara
-    ? filtered.filter(t => t.status === 'pending' || t.status === 'ditolak').map(t => t.id)
+    ? rows.filter(t => t.status === 'pending' || t.status === 'ditolak').map(t => t.id)
     : canApprove
-      ? filtered.filter(t => t.status === 'diajukan').map(t => t.id)
+      ? rows.filter(t => t.status === 'diajukan').map(t => t.id)
       : []
 
   const submitableSelected = isBendahara
-    ? [...selected].filter(id => filtered.find(t => t.id === id)?.status === 'pending')
+    ? [...selected].filter(id => rows.find(t => t.id === id)?.status === 'pending')
     : []
 
   const approvableSelected = canApprove
-    ? [...selected].filter(id => filtered.find(t => t.id === id)?.status === 'diajukan')
+    ? [...selected].filter(id => rows.find(t => t.id === id)?.status === 'diajukan')
     : []
 
   const allSelected    = selectableIds.length > 0 && selectableIds.every(id => selected.has(id))
@@ -267,7 +207,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
   const handleBulkSubmit = async () => {
     const missingAccount = submitableSelected.filter(id => {
-      const tx = filtered.find(t => t.id === id)
+      const tx = rows.find(t => t.id === id)
       return tx?.type === 'penerimaan' && !tx.destinationAccountId
     })
     if (missingAccount.length > 0) {
@@ -345,7 +285,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
   const handleSubmit = async (txId: string) => {
     setActionError(null)
-    const tx = filtered.find(t => t.id === txId)
+    const tx = rows.find(t => t.id === txId)
     if (tx?.type === 'penerimaan' && !tx.destinationAccountId) {
       setActionError('Transaksi BPN ini belum memiliki rekening bank. Edit transaksi dan pilih rekening bank terlebih dahulu.')
       return
@@ -401,13 +341,11 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
     onMutated?.()
   }
 
-  const hasActiveFilter = !!searchText || !!filterStatusLocal || !!dateFrom || !!dateTo || !!filterMonth || !!filterAccountId
+  const hasActiveFilter = !!searchText || !!filterStatusLocal || !!filterMonth || !!filterAccountId
 
   function resetFilters() {
     setSearchText('')
     setFilterStatusLocal('')
-    setDateFrom('')
-    setDateTo('')
     setFilterMonth('')
     setFilterAccountId('')
   }
@@ -463,8 +401,8 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
 
       {/* ── Filter Bar ─────────────────────────────────────────────────────── */}
       {!limit && (
-        <div className="mb-4 space-y-2">
-          {/* Baris 1: Search + Status + Bulan + Bank */}
+        <div className="mb-4">
+          {/* Baris: Search + Status + Bulan + Bank + Reset + info */}
           <div className="flex flex-wrap gap-2 items-center">
             {/* Search */}
             <div className="relative flex-1 min-w-[180px]">
@@ -530,57 +468,25 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
                 Reset
               </button>
             )}
-          </div>
 
-          {/* Baris 2: Quick date + Tanggal range + info */}
-          <div className="flex flex-wrap gap-2 items-center">
-            {/* Quick shortcuts */}
-            {(['week', 'month', 'year'] as const).map(p => (
-              <button
-                key={p}
-                onClick={() => setQuickDate(p)}
-                className="px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(232,234,240,0.7)' }}
-              >
-                {p === 'week' ? 'Pekan Ini' : p === 'month' ? 'Bulan Ini' : 'Tahun Ini'}
-              </button>
-            ))}
-
-            {/* Tanggal dari */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>Dari</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)}
-                className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
-              />
-            </div>
-
-            {/* Tanggal sampai */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>s/d</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={e => setDateTo(e.target.value)}
-                className="px-3 py-1.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#e8eaf0', colorScheme: 'dark' }}
-              />
-            </div>
-
-            {hasActiveFilter && (
-              <span className="text-xs text-on-surface-variant ml-1">
-                {filtered.length} dari {transactions.length} transaksi
-              </span>
-            )}
+            {/* Info jumlah */}
+            <span className="text-xs ml-auto" style={{ color: 'rgba(232,234,240,0.4)' }}>
+              {totalRows} transaksi
+            </span>
           </div>
         </div>
       )}
 
+      {/* ── Loading skeleton ───────────────────────────────────────────────── */}
+      {loading && (
+        <div className="flex items-center justify-center py-16 gap-3" style={{ color: 'rgba(232,234,240,0.4)' }}>
+          <span className="material-symbols-outlined animate-spin" style={{ fontSize: '1.4rem' }}>progress_activity</span>
+          <span className="text-sm">Memuat data…</span>
+        </div>
+      )}
+
       {/* ── Empty state ────────────────────────────────────────────────────── */}
-      {filtered.length === 0 && (
+      {!loading && rows.length === 0 && (
         <EmptyState
           icon={hasActiveFilter ? 'search_off' : 'receipt_long'}
           title={hasActiveFilter ? 'Tidak ada hasil' : 'Belum ada transaksi'}
@@ -588,7 +494,7 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
         />
       )}
 
-      {filtered.length > 0 && <>
+      {rows.length > 0 && <>
         {/* Error bar */}
         {actionError && (
           <div className="mb-3 px-4 py-2 rounded-xl text-sm font-body" style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}>
@@ -914,27 +820,25 @@ function Pagination({ page, totalPages, pageSize, totalRows, startIndex, endInde
         </label>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center gap-1">
-          <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(1)} disabled={page === 1} title="Halaman pertama">
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>first_page</span>
-          </button>
-          <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(page - 1)} disabled={page === 1} title="Sebelumnya">
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_left</span>
-          </button>
-          {pages.map((p, i) =>
-            p === '…'
-              ? <span key={`e-${i}`} className="px-1 text-xs text-on-surface-variant select-none">…</span>
-              : <button key={p} className={`${btnBase} ${p === page ? btnActive : btnInactive}`} onClick={() => onPage(p as number)}>{p}</button>
-          )}
-          <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(page + 1)} disabled={page === totalPages} title="Berikutnya">
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_right</span>
-          </button>
-          <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(totalPages)} disabled={page === totalPages} title="Halaman terakhir">
-            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>last_page</span>
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-1">
+        <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(1)} disabled={page === 1} title="Halaman pertama">
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>first_page</span>
+        </button>
+        <button className={`${btnBase} ${page === 1 ? btnDisabled : btnInactive}`} onClick={() => onPage(page - 1)} disabled={page === 1} title="Sebelumnya">
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_left</span>
+        </button>
+        {pages.map((p, i) =>
+          p === '…'
+            ? <span key={`e-${i}`} className="px-1 text-xs text-on-surface-variant select-none">…</span>
+            : <button key={p} className={`${btnBase} ${p === page ? btnActive : btnInactive}`} onClick={() => onPage(p as number)}>{p}</button>
+        )}
+        <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(page + 1)} disabled={page === totalPages} title="Berikutnya">
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>chevron_right</span>
+        </button>
+        <button className={`${btnBase} ${page === totalPages ? btnDisabled : btnInactive}`} onClick={() => onPage(totalPages)} disabled={page === totalPages} title="Halaman terakhir">
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>last_page</span>
+        </button>
+      </div>
     </div>
   )
 }

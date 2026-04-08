@@ -3,7 +3,6 @@ import { AppLayout } from '../layouts/AppLayout'
 import { AuthGuard } from '../components/auth/AuthGuard'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { DashboardPage } from '../pages/DashboardPage'
-import LandingPage from '../pages/LandingPage'
 import { BPNPage } from '../pages/penerimaan/BPNPage'
 import { BPKPage } from '../pages/pengeluaran/BPKPage'
 import { UPTUPPage } from '../pages/pengeluaran/UPTUPPage'
@@ -22,7 +21,7 @@ import { PendapatanSummaryPage } from '../pages/laporan/PendapatanSummaryPage'
 import { BPNKeluarPage }         from '../pages/penerimaan/BPNKeluarPage'
 
 export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage /> },
+  { path: '/', element: <LoginPage /> },
   { path: 'login', element: <LoginPage /> },
   {
     path:    '',
