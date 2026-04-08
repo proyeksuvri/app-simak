@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabase'
 const TENANT_ID = '11111111-1111-1111-1111-111111111111'
 
 export interface PendapatanSummaryRow {
-  jenis_pendapatan_id: string
-  jenis_pendapatan:    string
-  account_id:          string
+  jenis_pendapatan_id:    string
+  kode_jenis_pendapatan:  string | null
+  jenis_pendapatan:       string
+  account_id:             string
   bank_name:           string
   account_name:        string
   account_number:      string

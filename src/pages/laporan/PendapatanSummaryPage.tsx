@@ -145,7 +145,7 @@ export function PendapatanSummaryPage() {
             <table className="w-full text-sm font-body">
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                  {['No','Bulan','Jenis Pendapatan','Bank','No. Rekening','Unit Kerja','Jml Transaksi','Total Pendapatan'].map(h => (
+                  {['No','Bulan','Kode','Jenis Pendapatan','Bank','No. Rekening','Unit Kerja','Jml Transaksi','Total Pendapatan'].map(h => (
                     <th
                       key={h}
                       className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider"
@@ -169,6 +169,9 @@ export function PendapatanSummaryPage() {
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#e8eaf0' }}>
                       {NAMA_BULAN[r.month - 1]} {r.year}
                     </td>
+                    <td className="px-4 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.5)' }}>
+                      {r.kode_jenis_pendapatan ?? '-'}
+                    </td>
                     <td className="px-4 py-3" style={{ color: '#e8eaf0' }}>{r.jenis_pendapatan}</td>
                     <td className="px-4 py-3 whitespace-nowrap" style={{ color: '#e8eaf0' }}>{r.bank_name}</td>
                     <td className="px-4 py-3 text-xs font-mono whitespace-nowrap" style={{ color: 'rgba(232,234,240,0.6)' }}>
@@ -188,7 +191,7 @@ export function PendapatanSummaryPage() {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-                  <td colSpan={6} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(232,234,240,0.5)' }}>
+                  <td colSpan={7} className="px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(232,234,240,0.5)' }}>
                     Total
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-bold" style={{ color: '#93c5fd' }}>
