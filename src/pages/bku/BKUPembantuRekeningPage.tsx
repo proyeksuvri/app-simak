@@ -27,7 +27,7 @@ export function BKUPembantuRekeningPage() {
 
   const activeAccount = accounts.find(a => a.id === activeAccountId)
 
-  const { entries, saldoAkhir, totalDebit, total, totalPages, loading: loadingBKU } =
+  const { entries, saldoAkhir, totalDebit, totalKredit, total, totalPages, loading: loadingBKU } =
     useBKUPage('penerimaan', page, pageSize, { accountId: activeAccountId })
 
   const loading = loadingAccounts || loadingBKU
@@ -103,6 +103,7 @@ export function BKUPembantuRekeningPage() {
         entries={entries}
         saldoAkhir={saldoAkhir}
         totalDebit={totalDebit}
+        totalKredit={totalKredit}
         loading={loading}
       />
 

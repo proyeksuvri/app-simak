@@ -39,11 +39,13 @@ function parseRupiah(formatted: string): number {
 import type { Transaction } from '../../types'
 
 interface TransactionFormModalProps {
-  open:      boolean
-  onClose:   () => void
-  txType:    'IN' | 'OUT'
-  onSuccess: () => void
-  editTx?:   Transaction   // jika diisi → mode edit
+  open:             boolean
+  onClose:          () => void
+  txType:           'IN' | 'OUT'
+  onSuccess:        () => void
+  editTx?:          Transaction    // jika diisi → mode edit
+  formTitle?:       string         // override judul modal
+  kategoriOptions?: string[]       // override daftar kategori
 }
 
 interface FormState {
@@ -78,6 +80,8 @@ export function TransactionFormModal({
   txType,
   onSuccess,
   editTx,
+  formTitle,
+  kategoriOptions,
 }: TransactionFormModalProps) {
   const { currentUser }   = useAppContext()
   const { workUnits }     = useWorkUnits()
@@ -119,12 +123,12 @@ export function TransactionFormModal({
   }, [open, editTx, lockedUnitId])
 
   const isBPN   = txType === 'IN'
-  const title   = isEdit
+  const title   = formTitle ?? (isEdit
     ? (isBPN ? 'Edit BPN — Bukti Penerimaan' : 'Edit BPK — Bukti Pengeluaran')
-    : (isBPN ? 'Input BPN — Bukti Penerimaan' : 'Input BPK — Bukti Pengeluaran')
-  const kategoriList = isBPN
+    : (isBPN ? 'Input BPN — Bukti Penerimaan' : 'Input BPK — Bukti Pengeluaran'))
+  const kategoriList = kategoriOptions ?? (isBPN
     ? revenueCategories.map(c => c.name)
-    : KATEGORI_PENGELUARAN
+    : KATEGORI_PENGELUARAN)
 
   // Mekanisme Bisnis: auto-resolve dari kategori yang dipilih (BPN only)
   const mekanismeBisnis = (() => {

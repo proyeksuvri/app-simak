@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { MetricCard } from '../components/domain/MetricCard'
 import { CashFlowChart } from '../components/domain/CashFlowChart'
-import { AlertBanner } from '../components/domain/AlertBanner'
 import { PendingApprovals } from '../components/domain/PendingApprovals'
 import { TransactionTable } from '../components/domain/TransactionTable'
 import { Card } from '../components/ui/Card'
@@ -87,13 +86,6 @@ export function DashboardPage() {
 
   return (
     <div className="px-6 pb-8 pt-5" style={{ color: '#e8eaf0' }}>
-
-      {/* Alert */}
-      {deadlineTutupBuku && (
-        <div className="mb-5">
-          <AlertBanner deadline={deadlineTutupBuku} />
-        </div>
-      )}
 
       {/* BPN Alert Strip */}
       {isBPN && bpnAlerts && (bpnAlerts.rejected > 0 || bpnAlerts.missingAccount > 0) && (

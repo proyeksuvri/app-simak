@@ -35,7 +35,7 @@ export function BKUPembantuJenisPendapatanPage() {
     setPage(1)
   }
 
-  const { entries, saldoAkhir, totalDebit, total, totalPages, loading: loadingBKU } =
+  const { entries, saldoAkhir, totalDebit, totalKredit, total, totalPages, loading: loadingBKU } =
     useBKUPage('penerimaan', page, pageSize, {
       jenisPendapatanId: activeId,
       accountId:         activeAccount || null,
@@ -152,6 +152,7 @@ export function BKUPembantuJenisPendapatanPage() {
         entries={entries}
         saldoAkhir={saldoAkhir}
         totalDebit={totalDebit}
+        totalKredit={totalKredit}
         loading={loading}
       />
 

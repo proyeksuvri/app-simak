@@ -43,11 +43,12 @@ const BULAN_OPTIONS = [
 ]
 
 interface TransactionTableProps {
-  filterType?:     TransactionType
-  filterStatus?:   Transaction['status']
-  filterUnitId?:   string
-  filterKategori?: string
-  limit?:          number
+  filterType?:         TransactionType
+  filterStatus?:       Transaction['status']
+  filterUnitId?:       string
+  filterKategori?:     string
+  filterKategoriList?: string[]
+  limit?:              number
   onMutated?:      () => void
 }
 
@@ -89,7 +90,7 @@ function Toast({ message, type, onDone }: ToastProps) {
 
 // ─── Komponen Utama ───────────────────────────────────────────────────────────
 
-export function TransactionTable({ filterType, filterStatus, filterUnitId, filterKategori, limit, onMutated }: TransactionTableProps) {
+export function TransactionTable({ filterType, filterStatus, filterUnitId, filterKategori, filterKategoriList, limit, onMutated }: TransactionTableProps) {
   const { currentUser } = useAppContext()
   const { transactions, refetch } = useTransactions({ type: filterType, status: filterStatus, unitId: filterUnitId })
   const approval = useApproval()
@@ -157,7 +158,11 @@ export function TransactionTable({ filterType, filterStatus, filterUnitId, filte
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
 
   const filtered = useMemo(() => {
-    let result = filterKategori ? transactions.filter(t => t.kategori === filterKategori) : transactions
+    let result = filterKategoriList
+      ? transactions.filter(t => filterKategoriList.includes(t.kategori))
+      : filterKategori
+        ? transactions.filter(t => t.kategori === filterKategori)
+        : transactions
 
     if (searchText.trim()) {
       const q = searchText.trim().toLowerCase()

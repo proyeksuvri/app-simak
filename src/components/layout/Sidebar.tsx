@@ -93,7 +93,10 @@ export function Sidebar() {
         {(isBendaharaPenerimaan || isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
           <SidebarGroup label="Transaksi">
             {(isBendaharaPenerimaan || isAdmin) && (
-              <SidebarNavItem to="/penerimaan/bpn"     icon="receipt_long"  label="Penerimaan (BPN)" />
+              <SidebarNavItem to="/penerimaan/bpn"        icon="receipt_long"  label="Penerimaan (BPN)" />
+            )}
+            {(isBendaharaPenerimaan || isAdmin) && (
+              <SidebarNavItem to="/penerimaan/bpn-keluar" icon="money_off"     label="Pengeluaran BPN" />
             )}
             {(isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
               <SidebarNavItem to="/pengeluaran/bpk"    icon="payments"      label="Pengeluaran (BPK)" />

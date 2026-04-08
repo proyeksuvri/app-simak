@@ -16,7 +16,20 @@ export type KategoriPengeluaran =
   | 'Pencairan UP'
   | 'Pencairan TUP'
 
-export type KategoriTransaksi = KategoriPenerimaan | KategoriPengeluaran
+export type KategoriPengeluaranBPN =
+  | 'Biaya Operasional BLU'
+  | 'Pengembalian UKT'
+  | 'Admin Bank'
+  | 'Pajak Bank'
+
+export const KATEGORI_PENGELUARAN_BPN: KategoriPengeluaranBPN[] = [
+  'Biaya Operasional BLU',
+  'Pengembalian UKT',
+  'Admin Bank',
+  'Pajak Bank',
+]
+
+export type KategoriTransaksi = KategoriPenerimaan | KategoriPengeluaran | KategoriPengeluaranBPN
 
 export interface Transaction {
   id:               string

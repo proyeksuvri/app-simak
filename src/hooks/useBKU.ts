@@ -4,6 +4,7 @@ import type { DbTransaction } from '../types/database'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
 import { queryCache, TTL } from '../lib/queryCache'
+import { KATEGORI_PENGELUARAN_BPN } from '../types/transaction'
 
 const COLS = [
   'id', 'type', 'amount', 'transaction_date', 'no_bukti', 'description',
@@ -66,7 +67,9 @@ export function useBKU(type: BKUType, unitId?: string) {
       .order('transaction_date', { ascending: true })
 
     if (type === 'penerimaan') {
-      q = q.eq('type', 'IN')
+      // Sertakan IN (penerimaan) dan OUT kategori BPN Keluar (pengeluaran bendahara penerimaan)
+      const bpnKeluarList = KATEGORI_PENGELUARAN_BPN.map(k => `"${k}"`).join(',')
+      q = q.or(`type.eq.IN,and(type.eq.OUT,kode_rekening.in.(${bpnKeluarList}))`)
     } else if (type === 'induk') {
       q = q.is('work_unit_id', null)
     } else {

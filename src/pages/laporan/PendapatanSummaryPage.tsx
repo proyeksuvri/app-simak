@@ -31,7 +31,7 @@ export function PendapatanSummaryPage() {
   const jenisOptions = useMemo(() => {
     const map = new Map<string, string>()
     allRows.forEach(r => map.set(r.jenis_pendapatan_id, r.jenis_pendapatan))
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+    return [...map.entries()].sort((a, b) => (a[1] ?? '').localeCompare(b[1] ?? ''))
   }, [allRows])
 
   const unitOptions = useMemo(() => {

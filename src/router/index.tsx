@@ -19,6 +19,7 @@ import { LaporanPage } from '../pages/laporan/LaporanPage'
 import { PengaturanPage } from '../pages/pengaturan/PengaturanPage'
 import { ApprovalPage }  from '../pages/approval/ApprovalPage'
 import { PendapatanSummaryPage } from '../pages/laporan/PendapatanSummaryPage'
+import { BPNKeluarPage }         from '../pages/penerimaan/BPNKeluarPage'
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
@@ -31,7 +32,8 @@ export const router = createBrowserRouter([
         element: <AppLayout />, 
         children: [
           { path: 'dashboard',            element: <DashboardPage /> },
-          { path: 'penerimaan/bpn',       element: <BPNPage /> },
+          { path: 'penerimaan/bpn',        element: <BPNPage /> },
+          { path: 'penerimaan/bpn-keluar', element: <BPNKeluarPage /> },
           { path: 'pengeluaran/bpk',      element: <BPKPage /> },
           { path: 'pengeluaran/up-tup',   element: <UPTUPPage /> },
           { path: 'bku/penerimaan',       element: <BKUPenerimaanPage /> },

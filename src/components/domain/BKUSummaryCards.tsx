@@ -3,10 +3,11 @@ import type { BKUEntryWithSaldo } from '../../types'
 import { formatRupiah } from '../../lib/formatters'
 
 interface BKUSummaryCardsProps {
-  entries:     BKUEntryWithSaldo[]
-  saldoAkhir:  number
-  loading:     boolean
-  totalDebit?: number  // sum of all debit across all pages (from RPC); falls back to entries sum
+  entries:      BKUEntryWithSaldo[]
+  saldoAkhir:   number
+  loading:      boolean
+  totalDebit?:  number  // sum of all debit across all pages (from RPC); falls back to entries sum
+  totalKredit?: number  // sum of all kredit across all pages (from RPC); falls back to entries sum
 }
 
 interface SummaryCardItemProps {
@@ -14,7 +15,7 @@ interface SummaryCardItemProps {
   label:      string
   value:      string
   subtitle?:  string
-  accent?:    'purple' | 'green' | 'blue'
+  accent?:    'purple' | 'green' | 'blue' | 'red'
   loading:    boolean
 }
 
@@ -36,6 +37,12 @@ const accentMap = {
     iconBorder:'rgba(96,165,250,0.2)',
     iconColor: '#60a5fa',
     valueColor:'#93c5fd',
+  },
+  red: {
+    iconBg:    'rgba(248,113,113,0.12)',
+    iconBorder:'rgba(248,113,113,0.2)',
+    iconColor: '#f87171',
+    valueColor:'#fca5a5',
   },
 }
 
@@ -104,10 +111,12 @@ function SummaryCardItem({ icon, label, value, subtitle, accent = 'purple', load
   )
 }
 
-export function BKUSummaryCards({ entries, saldoAkhir, loading, totalDebit }: BKUSummaryCardsProps) {
+export function BKUSummaryCards({ entries, saldoAkhir, loading, totalDebit, totalKredit }: BKUSummaryCardsProps) {
   const stats = useMemo(() => {
-    const pageDebitSum    = entries.reduce((sum, e) => sum + e.debit, 0)
-    const totalPenerimaan = totalDebit ?? pageDebitSum
+    const pageDebitSum    = entries.reduce((sum, e) => sum + e.debit,  0)
+    const pageKreditSum   = entries.reduce((sum, e) => sum + e.kredit, 0)
+    const totalPenerimaan = totalDebit  ?? pageDebitSum
+    const totalPengeluaran = totalKredit ?? pageKreditSum
     const jumlahTransaksi = entries.filter(e => e.debit > 0).length
 
     // Penerimaan hari ini
@@ -116,11 +125,11 @@ export function BKUSummaryCards({ entries, saldoAkhir, loading, totalDebit }: BK
       .filter(e => e.tanggal === today && e.debit > 0)
       .reduce((sum, e) => sum + e.debit, 0)
 
-    return { totalPenerimaan, jumlahTransaksi, penerimaanHariIni }
-  }, [entries, totalDebit])
+    return { totalPenerimaan, totalPengeluaran, jumlahTransaksi, penerimaanHariIni }
+  }, [entries, totalDebit, totalKredit])
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
       <SummaryCardItem
         icon="payments"
         label="Total Penerimaan"
@@ -131,6 +140,14 @@ export function BKUSummaryCards({ entries, saldoAkhir, loading, totalDebit }: BK
             : 'Tidak ada penerimaan hari ini'
         }
         accent="green"
+        loading={loading}
+      />
+      <SummaryCardItem
+        icon="money_off"
+        label="Total Pengeluaran"
+        value={formatRupiah(stats.totalPengeluaran)}
+        subtitle="Akumulasi pengeluaran"
+        accent="red"
         loading={loading}
       />
       <SummaryCardItem
