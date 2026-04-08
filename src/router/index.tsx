@@ -18,6 +18,7 @@ import { RekonsiliasiPage } from '../pages/rekonsiliasi/RekonsiliasiPage'
 import { LaporanPage } from '../pages/laporan/LaporanPage'
 import { PengaturanPage } from '../pages/pengaturan/PengaturanPage'
 import { ApprovalPage }  from '../pages/approval/ApprovalPage'
+import { PendapatanSummaryPage } from '../pages/laporan/PendapatanSummaryPage'
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
           { path: 'rekonsiliasi',         element: <RekonsiliasiPage /> },
           { path: 'rekonsiliasi/opname',  element: <RekonsiliasiPage /> },
           { path: 'laporan',              element: <LaporanPage /> },
+          { path: 'laporan/pendapatan-summary', element: <PendapatanSummaryPage /> },
           { path: 'pengaturan',           element: <PengaturanPage /> },
           { path: 'pengaturan/users',     element: <PengaturanPage /> },
           { path: 'pengaturan/units',     element: <PengaturanPage /> },

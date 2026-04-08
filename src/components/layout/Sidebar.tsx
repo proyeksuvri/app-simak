@@ -144,7 +144,8 @@ export function Sidebar() {
 
         {/* Laporan & Admin */}
         <SidebarGroup label="Laporan">
-          <SidebarNavItem to="/laporan" icon="summarize" label="Laporan" />
+          <SidebarNavItem to="/laporan"                      icon="summarize"      label="Laporan" />
+          <SidebarNavItem to="/laporan/pendapatan-summary"   icon="bar_chart"      label="Ringkasan Pendapatan" />
         </SidebarGroup>
 
         {isAdmin && (
