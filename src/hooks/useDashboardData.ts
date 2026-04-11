@@ -40,6 +40,11 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
       setLoading(true)
 
       // ── 1. Metric totals ───────────────────────────────────────────────────
+      const [fromYear, fromMonth] = filterFrom.split('-').map(Number) as [number, number]
+      const [toYear, toMonth] = filterTo.split('-').map(Number) as [number, number]
+      const fromMonthKey = fromYear * 100 + fromMonth
+      const toMonthKey = toYear * 100 + toMonth
+
       let aggQuery = supabase
         .from('transactions')
         .select('type, amount, status')
@@ -51,6 +56,15 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
       if (isBPN) aggQuery = aggQuery.eq('type', 'IN')
       if (isBPK) aggQuery = aggQuery.eq('type', 'OUT')
       if (role === 'bendahara_pembantu' && unitId) aggQuery = aggQuery.eq('work_unit_id', unitId)
+
+      // ── Query vw_dashboard_summary langsung (view kini punya kolom year & month)
+      const kpiViewQuery = (!isBPN && !isBPK)
+        ? supabase
+            .from('vw_dashboard_summary')
+            .select('period_id, year, month, total_penerimaan, total_pengeluaran, saldo_kas, transaksi_verified')
+            .gte('year', fromYear)
+            .lte('year', toYear)
+        : Promise.resolve({ data: [] })
 
       // ── 2. Chart (daily atau monthly tergantung rentang) ──────────────────
       const dayDiff = Math.round(
@@ -104,14 +118,30 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
             .lte('transaction_date', filterTo)
         : Promise.resolve({ data: null })
 
-      const [aggResult, chartResult, pendingResult, periodResult, bpnResult] = await Promise.all([
-        aggQuery, chartQuery, pendingQuery, periodQuery, bpnFullQuery,
+      const [aggResult, kpiViewResult, chartResult, pendingResult, periodResult, bpnResult] = await Promise.all([
+        aggQuery, kpiViewQuery, chartQuery, pendingQuery, periodQuery, bpnFullQuery,
       ])
 
       if (cancelled) return
 
       // ── Proses metric totals ───────────────────────────────────────────────
       const agg = (aggResult.data ?? []) as Pick<DbTransaction, 'type' | 'amount' | 'status'>[]
+      // Filter baris yang masuk dalam rentang bulan (year*100+month)
+      const rawKpiRows = ((kpiViewResult.data ?? []) as Array<Record<string, unknown>>)
+        .map(r => ({
+          period_id:          String(r.period_id ?? ''),
+          year:               Number(r.year ?? 0),
+          month:              Number(r.month ?? 0),
+          total_penerimaan:   Number(r.total_penerimaan ?? 0),
+          total_pengeluaran:  Number(r.total_pengeluaran ?? 0),
+          saldo_kas:          Number(r.saldo_kas ?? 0),
+          transaksi_verified: Number(r.transaksi_verified ?? 0),
+        }))
+
+      const kpiRows = rawKpiRows.filter(r => {
+        const key = r.year * 100 + r.month
+        return key >= fromMonthKey && key <= toMonthKey
+      })
 
       let totalMasuk = 0, totalKeluar = 0
       for (const r of agg) {
@@ -139,11 +169,25 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
           { id: 'm4', label: 'BPK Diposting',       value: countPosted,   icon: 'task_alt',               trendDir: 'neutral', trend: 0, subtitle: 'Sudah diposting ke BKU', format: 'count' },
         ])
       } else {
+        const hasViewData = kpiRows.length > 0
+        const totalMasukView = hasViewData
+          ? kpiRows.reduce((s, r) => s + Number(r.total_penerimaan ?? 0), 0)
+          : totalMasuk
+        const totalKeluarView = hasViewData
+          ? kpiRows.reduce((s, r) => s + Number(r.total_pengeluaran ?? 0), 0)
+          : totalKeluar
+        const saldoKasView = hasViewData
+          ? kpiRows.reduce((s, r) => s + Number(r.saldo_kas ?? 0), 0)
+          : saldoKas
+        const verifiedView = hasViewData
+          ? kpiRows.reduce((s, r) => s + Number(r.transaksi_verified ?? 0), 0)
+          : agg.length
+
         setMetrics([
-          { id: 'm1', label: 'Total Penerimaan',   value: totalMasuk,   icon: 'trending_up',             trendDir: 'up',      trend: 0, subtitle: periodLabel },
-          { id: 'm2', label: 'Total Pengeluaran',  value: totalKeluar,  icon: 'trending_down',            trendDir: 'down',    trend: 0, subtitle: periodLabel },
-          { id: 'm3', label: 'Saldo Kas',          value: saldoKas,     icon: 'account_balance_wallet',   trendDir: 'neutral', trend: 0, subtitle: 'Kas bersih' },
-          { id: 'm4', label: 'Transaksi Verified', value: agg.length,   icon: 'verified',                 trendDir: 'neutral', trend: 0, subtitle: 'Transaksi terposting' },
+          { id: 'm1', label: 'Total Penerimaan',   value: totalMasukView,   icon: 'trending_up',             trendDir: 'up',      trend: 0, subtitle: periodLabel },
+          { id: 'm2', label: 'Total Pengeluaran',  value: totalKeluarView,  icon: 'trending_down',            trendDir: 'down',    trend: 0, subtitle: periodLabel },
+          { id: 'm3', label: 'Saldo Kas',          value: saldoKasView,     icon: 'account_balance_wallet',   trendDir: 'neutral', trend: 0, subtitle: 'Kas bersih' },
+          { id: 'm4', label: 'Transaksi Verified', value: verifiedView,     icon: 'verified',                 trendDir: 'neutral', trend: 0, subtitle: 'Transaksi terposting' },
         ])
       }
 

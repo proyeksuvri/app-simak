@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Card } from '../../components/ui/Card'
-import { Table, TableHead, TableHeadCell, TableBody, TableRow, TableCell } from '../../components/ui/Table/Table'
-import { Button } from '../../components/ui/Button'
+import { supabase } from '../../lib/supabase'
 import { Modal } from '../../components/ui/Modal'
+import { ThemeCard, ThemeTabNav, ThemeButton } from '../../components/ui/Theme'
 import { PageContainer } from '../../components/layout/PageContainer'
 import { useAppContext } from '../../context/AppContext'
 import { useUsers } from '../../hooks/useUsers'
@@ -35,6 +34,13 @@ export function PengaturanPage() {
   const [periodActionMsg, setPeriodActionMsg] = useState<string | null>(null)
   const [periodActionErr, setPeriodActionErr] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [profileName, setProfileName] = useState(currentUser.nama === '...' ? '' : currentUser.nama)
+  const [profilePassword, setProfilePassword] = useState('')
+  const [profilePasswordConfirm, setProfilePasswordConfirm] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
 
   const usersState = useUsers()
   const periodsState = useManagePeriods()
@@ -65,60 +71,146 @@ export function PengaturanPage() {
     setSaving(false)
   }
 
+  const openProfileModal = () => {
+    setProfileName(currentUser.nama === '...' ? '' : currentUser.nama)
+    setProfilePassword('')
+    setProfilePasswordConfirm('')
+    setProfileError(null)
+    setProfileModalOpen(true)
+  }
+
+  const handleSaveProfile = async () => {
+    const nama = profileName.trim()
+    setProfileError(null)
+    setProfileSuccess(null)
+
+    if (!nama) {
+      setProfileError('Nama wajib diisi.')
+      return
+    }
+
+    if (profilePassword && profilePassword.length < 8) {
+      setProfileError('Password baru minimal 8 karakter.')
+      return
+    }
+
+    if (profilePassword !== profilePasswordConfirm) {
+      setProfileError('Konfirmasi password belum sesuai.')
+      return
+    }
+
+    setProfileSaving(true)
+
+    const { data: authData, error: getUserError } = await supabase.auth.getUser()
+    if (getUserError || !authData.user) {
+      setProfileSaving(false)
+      setProfileError(getUserError?.message ?? 'Sesi login tidak ditemukan.')
+      return
+    }
+
+    const userMetadata = (authData.user.user_metadata ?? {}) as Record<string, unknown>
+    const payload = {
+      data: {
+        ...userMetadata,
+        nama,
+      },
+      ...(profilePassword ? { password: profilePassword } : {}),
+    }
+
+    const { error } = await supabase.auth.updateUser(payload)
+    setProfileSaving(false)
+
+    if (error) {
+      setProfileError(error.message)
+      return
+    }
+
+    setProfileModalOpen(false)
+    setProfileSuccess(profilePassword
+      ? 'Profil dan password berhasil diperbarui.'
+      : 'Profil berhasil diperbarui.')
+  }
+
+  const allTabs = useMemo(() => {
+    const base = [{ key: 'profil' as PengaturanTab, label: 'Profil' }]
+    if (!isAdmin) return base
+    return [
+      ...base,
+      { key: 'periode'   as PengaturanTab, label: 'Periode' },
+      { key: 'user'      as PengaturanTab, label: 'User' },
+      { key: 'rekening'  as PengaturanTab, label: 'Rekening Bank' },
+      { key: 'kategori'  as PengaturanTab, label: 'Kategori Penerimaan' },
+      { key: 'mekanisme' as PengaturanTab, label: 'Mekanisme Bisnis' },
+      { key: 'jenis'     as PengaturanTab, label: 'Jenis Pendapatan' },
+      { key: 'sumber'    as PengaturanTab, label: 'Sumber Pendapatan Bisnis' },
+      { key: 'unit-kerja'as PengaturanTab, label: 'Unit Kerja' },
+    ]
+  }, [isAdmin])
+
   return (
     <PageContainer title="Pengaturan">
-      <div className="flex items-center gap-2 mb-4">
-        <TabButton label="Profil" active={activeTab === 'profil'} onClick={() => setManualTab('profil')} />
-        {isAdmin && (
-          <>
-            <TabButton label="Periode" active={activeTab === 'periode'} onClick={() => setManualTab('periode')} />
-            <TabButton label="User" active={activeTab === 'user'} onClick={() => setManualTab('user')} />
-            <TabButton label="Rekening Bank" active={activeTab === 'rekening'} onClick={() => setManualTab('rekening')} />
-            <TabButton label="Kategori Penerimaan" active={activeTab === 'kategori'} onClick={() => setManualTab('kategori')} />
-            <TabButton label="Mekanisme Bisnis" active={activeTab === 'mekanisme'} onClick={() => setManualTab('mekanisme')} />
-            <TabButton label="Jenis Pendapatan" active={activeTab === 'jenis'} onClick={() => setManualTab('jenis')} />
-            <TabButton label="Sumber Pendapatan Bisnis" active={activeTab === 'sumber'} onClick={() => setManualTab('sumber')} />
-            <TabButton label="Unit Kerja" active={activeTab === 'unit-kerja'} onClick={() => setManualTab('unit-kerja')} />
-          </>
-        )}
-      </div>
+      <ThemeTabNav
+        tabs={allTabs}
+        activeTab={activeTab}
+        onTabChange={(key) => setManualTab(key as PengaturanTab)}
+        className="mb-6"
+      />
 
       {activeTab === 'profil' && (
         <div className="grid grid-cols-2 gap-4">
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-on-surface font-headline mb-4">Profil Pengguna</h3>
+          <ThemeCard className="p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                account_circle
+              </span>
+              <h3 className="text-sm font-semibold text-white font-headline tracking-wide uppercase">Profil Pengguna</h3>
+            </div>
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-gradient flex items-center justify-center flex-shrink-0">
-                <span className="text-xl font-bold text-on-primary font-headline">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#009B72,#006650)' }}>
+                <span className="text-xl font-bold text-white font-headline">
                   {currentUser.nama.charAt(0)}
                 </span>
               </div>
               <div>
-                <p className="font-semibold text-on-surface font-body">{currentUser.nama}</p>
-                <p className="text-xs text-on-surface-variant font-body">{USER_ROLE_LABELS[currentUser.role]}</p>
-                <p className="text-xs text-on-surface-variant font-body mt-0.5">{currentUser.email}</p>
+                <p className="font-semibold text-white font-body">{currentUser.nama}</p>
+                <p className="text-xs text-white/50 font-body">{USER_ROLE_LABELS[currentUser.role]}</p>
+                <p className="text-xs text-white/40 font-body mt-0.5">{currentUser.email}</p>
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-1">
               {[
                 { label: 'NIP', value: currentUser.nip || '-' },
                 { label: 'Role', value: USER_ROLE_LABELS[currentUser.role] },
                 { label: 'Tahun Anggaran Aktif', value: String(tahunAnggaran) },
               ].map(item => (
-                <div key={item.label} className="flex items-center justify-between py-2">
-                  <span className="text-xs text-on-surface-variant font-body">{item.label}</span>
-                  <span className="text-sm font-medium text-on-surface font-body">{item.value}</span>
+                <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-white/5">
+                  <span className="text-xs text-white/50 font-body">{item.label}</span>
+                  <span className="text-sm font-medium text-white font-body">{item.value}</span>
                 </div>
               ))}
             </div>
-            <Button variant="secondary" size="sm" className="mt-4 w-full" icon="edit" disabled>
-              Edit Profil (Segera)
-            </Button>
-          </Card>
+            {profileSuccess && (
+              <div className="mt-4 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">
+                {profileSuccess}
+              </div>
+            )}
+            <ThemeButton variant="text-primary" className="mt-4 w-full justify-center" onClick={openProfileModal}>
+              <span className="material-symbols-outlined text-base">edit</span>
+              Edit Profil
+            </ThemeButton>
+          </ThemeCard>
 
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-on-surface font-headline mb-4">Konfigurasi Sistem</h3>
-            <div className="space-y-3">
+          <ThemeCard className="p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                settings
+              </span>
+              <h3 className="text-sm font-semibold text-white font-headline tracking-wide uppercase">Konfigurasi Sistem</h3>
+            </div>
+            <div className="space-y-1">
               {[
                 { label: 'Institusi', value: 'UIN Palopo' },
                 { label: 'Jenis', value: 'BLU (Badan Layanan Umum)' },
@@ -126,79 +218,124 @@ export function PengaturanPage() {
                 { label: 'Tahun Anggaran', value: `${tahunAnggaran}` },
                 { label: 'Versi Aplikasi', value: 'v1.0.0' },
               ].map(item => (
-                <div key={item.label} className="flex items-center justify-between py-2">
-                  <span className="text-xs text-on-surface-variant font-body">{item.label}</span>
-                  <span className="text-sm font-medium text-on-surface font-body">{item.value}</span>
+                <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-white/5">
+                  <span className="text-xs text-white/50 font-body">{item.label}</span>
+                  <span className="text-sm font-medium text-white font-body">{item.value}</span>
                 </div>
               ))}
             </div>
-          </Card>
+          </ThemeCard>
         </div>
       )}
 
       {activeTab === 'periode' && isAdmin && (
         <div className="grid grid-cols-2 gap-4">
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-on-surface font-headline mb-4">Buka Periode</h3>
+          {/* ── Buka Periode ── */}
+          <ThemeCard className="p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                event_available
+              </span>
+              <h3 className="text-sm font-semibold text-white font-headline tracking-wide uppercase">
+                Buka Periode
+              </h3>
+            </div>
+
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="text-xs text-on-surface-variant font-body mb-1 block">Bulan</label>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">Bulan</label>
                 <select
                   value={selectedMonth}
                   onChange={e => setSelectedMonth(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container text-sm text-on-surface outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm text-white
+                    bg-white/5 border border-white/10
+                    focus:outline-none focus:ring-2 focus:ring-[#009B72]/50
+                    transition-all appearance-none"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
                 >
                   {periodsState.BULAN.map((label, idx) => {
                     if (!label) return null
-                    return <option key={idx} value={idx}>{label}</option>
+                    return <option key={idx} value={idx} className="bg-[#1a2236] text-white">{label}</option>
                   })}
                 </select>
               </div>
-              <Button size="sm" icon="event_available" onClick={handleOpenPeriod} disabled={saving}>
+              <ThemeButton onClick={handleOpenPeriod} disabled={saving}>
+                <span className="material-symbols-outlined text-base"
+                  style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                  event_available
+                </span>
                 {saving ? 'Memproses...' : 'Buka Periode'}
-              </Button>
+              </ThemeButton>
             </div>
 
             {periodActionMsg && (
-              <p className="mt-3 text-sm text-primary font-body">{periodActionMsg}</p>
-            )}
-            {periodActionErr && (
-              <p className="mt-3 text-sm text-error font-body">{periodActionErr}</p>
-            )}
-          </Card>
-
-          <Card padding="md">
-            <h3 className="text-sm font-semibold text-on-surface font-headline mb-4">Periode Tahun {tahunAnggaran}</h3>
-            {periodsState.loading ? (
-              <p className="text-sm text-on-surface-variant font-body">Memuat periode...</p>
-            ) : periodsState.periods.length === 0 ? (
-              <p className="text-sm text-on-surface-variant font-body">Belum ada periode untuk tahun ini.</p>
-            ) : (
-              <div className="space-y-2">
-                {periodsState.periods.map(period => (
-                  <div key={period.id} className="flex items-center justify-between bg-surface-container rounded-xl px-3 py-2">
-                    <div>
-                      <p className="text-sm text-on-surface font-body">{period.code || `${periodsState.BULAN[period.month]}-${period.year}`}</p>
-                      <p className="text-xs text-on-surface-variant font-body">
-                        {period.isClosed ? 'Status: Ditutup' : 'Status: Aktif'}
-                      </p>
-                    </div>
-                    {!period.isClosed && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon="lock"
-                        disabled={saving}
-                        onClick={() => handleClosePeriod(period.id, period.month)}
-                      >
-                        Tutup
-                      </Button>
-                    )}
-                  </div>
-                ))}
+              <div className="mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">
+                {periodActionMsg}
               </div>
             )}
-          </Card>
+            {periodActionErr && (
+              <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">
+                {periodActionErr}
+              </div>
+            )}
+          </ThemeCard>
+
+          {/* ── Daftar Periode ── */}
+          <ThemeCard>
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-[#1E293B]">
+              <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                calendar_month
+              </span>
+              <h3 className="text-sm font-semibold text-white font-headline tracking-wide uppercase">
+                Periode Tahun {tahunAnggaran}
+              </h3>
+            </div>
+
+            <div className="p-4">
+              {periodsState.loading ? (
+                <p className="text-sm text-white/40 font-body py-4 text-center">Memuat periode...</p>
+              ) : periodsState.periods.length === 0 ? (
+                <p className="text-sm text-white/40 font-body py-4 text-center">Belum ada periode untuk tahun ini.</p>
+              ) : (
+                <div className="space-y-2">
+                  {periodsState.periods.map(period => (
+                    <div
+                      key={period.id}
+                      className="flex items-center justify-between px-4 py-3 rounded-xl border border-white/5"
+                      style={{ background: 'rgba(255,255,255,0.04)' }}
+                    >
+                      <div>
+                        <p className="text-sm text-white font-body">
+                          {period.code || `${periodsState.BULAN[period.month]}-${period.year}`}
+                        </p>
+                        <p className="text-xs mt-0.5 font-body">
+                          {period.isClosed
+                            ? <span className="text-red-400/80">Ditutup</span>
+                            : <span className="text-[#009B72]">Aktif</span>
+                          }
+                        </p>
+                      </div>
+                      {!period.isClosed && (
+                        <ThemeButton
+                          variant="danger"
+                          disabled={saving}
+                          onClick={() => handleClosePeriod(period.id, period.month)}
+                        >
+                          <span className="material-symbols-outlined text-base"
+                            style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                            lock
+                          </span>
+                          Tutup
+                        </ThemeButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ThemeCard>
         </div>
       )}
 
@@ -229,25 +366,85 @@ export function PengaturanPage() {
       {activeTab === 'unit-kerja' && isAdmin && (
         <UnitKerjaTab />
       )}
-    </PageContainer>
-  )
-}
 
-function TabButton({
-  label, active, onClick,
-}: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'px-3 py-1.5 rounded-xl text-xs font-medium font-body transition-colors',
-        active
-          ? 'bg-primary text-on-primary'
-          : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high',
-      ].join(' ')}
-    >
-      {label}
-    </button>
+      <Modal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} title="Edit Profil" maxWidth="sm">
+        <div className="px-6 py-5 space-y-4">
+          <FormField label="Nama Lengkap" icon="badge">
+            <input
+              type="text"
+              value={profileName}
+              onChange={e => {
+                setProfileName(e.target.value)
+                setProfileError(null)
+              }}
+              placeholder="Masukkan nama lengkap"
+              className={inputCls}
+            />
+          </FormField>
+
+          <FormField label="NIP" icon="badge">
+            <input
+              type="text"
+              value={currentUser.nip || currentUser.email.split('@')[0] || '-'}
+              readOnly
+              className={inputCls + ' cursor-not-allowed opacity-70'}
+            />
+          </FormField>
+
+          <FormField label="Email Login" icon="mail">
+            <input
+              type="text"
+              value={currentUser.email}
+              readOnly
+              className={inputCls + ' cursor-not-allowed opacity-70'}
+            />
+          </FormField>
+
+          <FormField label="Password Baru" icon="lock">
+            <input
+              type="password"
+              value={profilePassword}
+              onChange={e => {
+                setProfilePassword(e.target.value)
+                setProfileError(null)
+              }}
+              placeholder="Kosongkan jika tidak ingin mengganti password"
+              className={inputCls}
+            />
+          </FormField>
+
+          <FormField label="Konfirmasi Password Baru" icon="lock_reset">
+            <input
+              type="password"
+              value={profilePasswordConfirm}
+              onChange={e => {
+                setProfilePasswordConfirm(e.target.value)
+                setProfileError(null)
+              }}
+              placeholder="Ulangi password baru"
+              className={inputCls}
+            />
+          </FormField>
+
+          {profileError && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>
+              {profileError}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 pb-5">
+          <ThemeButton variant="text-primary" onClick={() => setProfileModalOpen(false)}>
+            Batal
+          </ThemeButton>
+          <ThemeButton disabled={profileSaving} onClick={handleSaveProfile}>
+            <span className="material-symbols-outlined text-base">save</span>
+            {profileSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+          </ThemeButton>
+        </div>
+      </Modal>
+    </PageContainer>
   )
 }
 
@@ -321,74 +518,57 @@ function KategoriPenerimaanTab() {
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Kategori Penerimaan</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
-              {categories.length} kategori terdaftar
-            </p>
+      <ThemeCard>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E293B]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>label</span>
+            <div>
+              <h3 className="text-sm font-semibold text-white font-headline">Kategori Penerimaan</h3>
+              <p className="text-xs text-white/40 font-body">{categories.length} kategori terdaftar</p>
+            </div>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
+          <ThemeButton onClick={openAdd}>
+            <span className="material-symbols-outlined text-base">add</span>
             Tambah Kategori
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
-            {success}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">{success}</div>
         )}
         {error && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">
-            {error}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">{error}</div>
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Memuat...</p>
         ) : categories.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
-            Belum ada kategori. Klik "Tambah Kategori" untuk menambahkan.
-          </p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Belum ada kategori. Klik "Tambah Kategori" untuk menambahkan.</p>
         ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
-              <tr>
+          <table className="w-full text-sm font-body">
+            <thead>
+              <tr className="border-b border-white/10">
                 {['No', 'Nama Kategori', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
+                  <th key={h} className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {categories.map((cat, idx) => (
-                <tr key={cat.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface-variant text-xs w-12">{idx + 1}</td>
-                  <td className="px-4 py-2.5 text-on-surface font-medium">
+                <tr key={cat.id} className={idx % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                  <td className="px-5 py-3.5 text-white/40 text-xs w-12">{idx + 1}</td>
+                  <td className="px-5 py-3.5 text-white font-medium">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-primary"
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                        label
-                      </span>
+                      <span className="material-symbols-outlined text-[16px] text-[#009B72]"
+                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>label</span>
                       {cat.name}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <button
-                        className="text-xs text-primary hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => openEdit(cat.id, cat.name)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-xs text-error hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => openDel(cat.id, cat.name)}
-                      >
-                        Hapus
-                      </button>
+                      <ThemeButton variant="text-primary" disabled={saving} onClick={() => openEdit(cat.id, cat.name)}>Edit</ThemeButton>
+                      <ThemeButton variant="text-danger" disabled={saving} onClick={() => openDel(cat.id, cat.name)}>Hapus</ThemeButton>
                     </div>
                   </td>
                 </tr>
@@ -396,32 +576,26 @@ function KategoriPenerimaanTab() {
             </tbody>
           </table>
         )}
-      </Card>
+      </ThemeCard>
 
       {/* Modal Tambah */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Kategori Penerimaan">
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Kategori" icon="label">
-            <input
-              type="text"
-              placeholder="Contoh: Dana Hibah"
-              className={inputCls}
-              value={addName}
-              onChange={e => { setAddName(e.target.value); setFormError(null) }}
-              autoFocus
-            />
+            <input type="text" placeholder="Contoh: Dana Hibah" className={inputCls}
+              value={addName} onChange={e => { setAddName(e.target.value); setFormError(null) }} autoFocus />
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {formError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleAdd}>
+            <ThemeButton variant="text-primary" onClick={() => setAddOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleAdd}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -430,48 +604,36 @@ function KategoriPenerimaanTab() {
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Kategori Penerimaan">
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Kategori" icon="label">
-            <input
-              type="text"
-              className={inputCls}
-              value={editName}
-              onChange={e => { setEditName(e.target.value); setFormError(null) }}
-              autoFocus
-            />
+            <input type="text" className={inputCls} value={editName}
+              onChange={e => { setEditName(e.target.value); setFormError(null) }} autoFocus />
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {formError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleEdit}>
+            <ThemeButton variant="text-primary" onClick={() => setEditOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleEdit}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Konfirmasi Hapus */}
+      {/* Modal Hapus */}
       <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Kategori">
         <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-on-surface-variant font-body">
-            Yakin ingin menghapus kategori{' '}
-            <span className="font-semibold text-on-surface">"{delName}"</span>?
+          <p className="text-sm text-white/60 font-body">
+            Yakin ingin menghapus kategori <span className="font-semibold text-white">"{delName}"</span>?
             Transaksi yang sudah menggunakan kategori ini tidak akan terpengaruh.
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
-            <Button
-              variant="primary"
-              size="sm"
-              className="bg-error text-on-error hover:bg-error/90"
-              disabled={saving}
-              onClick={handleDelete}
-            >
+            <ThemeButton variant="text-primary" onClick={() => setDelOpen(false)}>Batal</ThemeButton>
+            <ThemeButton variant="danger" disabled={saving} onClick={handleDelete}>
               {saving ? 'Menghapus...' : 'Hapus'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -681,76 +843,67 @@ function JenisPendapatanTab() {
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-white font-headline">Jenis Pendapatan</h3>
-            <p className="text-xs text-white/60 font-body mt-0.5">
-              {fundingSources.length} jenis terdaftar
-            </p>
+      <ThemeCard>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E293B]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>payments</span>
+            <div>
+              <h3 className="text-sm font-semibold text-white font-headline">Jenis Pendapatan</h3>
+              <p className="text-xs text-white/40 font-body">{fundingSources.length} jenis terdaftar</p>
+            </div>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
+          <ThemeButton onClick={openAdd}>
+            <span className="material-symbols-outlined text-base">add</span>
             Tambah Jenis
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">{success}</div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">{success}</div>
         )}
         {error && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">{error}</div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">{error}</div>
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">Memuat...</p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Memuat...</p>
         ) : fundingSources.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">
-            Belum ada jenis pendapatan. Klik "Tambah Jenis" untuk menambahkan.
-          </p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Belum ada jenis pendapatan. Klik "Tambah Jenis" untuk menambahkan.</p>
         ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-white/10 border-b border-white/20">
-              <tr>
+          <table className="w-full text-sm font-body">
+            <thead>
+              <tr className="border-b border-white/10">
                 {['No', 'Nama Jenis Pendapatan', 'Kode Akun BAS', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs text-white uppercase tracking-wide font-semibold">{h}</th>
+                  <th key={h} className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {fundingSources.map((f, idx) => (
-                <tr key={f.id} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                  <td className="px-4 py-2.5 text-white/50 text-xs w-12">{idx + 1}</td>
-                  <td className="px-4 py-2.5 text-white font-medium">
+                <tr key={f.id} className={idx % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                  <td className="px-5 py-3.5 text-white/40 text-xs w-12">{idx + 1}</td>
+                  <td className="px-5 py-3.5 text-white font-medium">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-primary"
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                        payments
-                      </span>
+                      <span className="material-symbols-outlined text-[16px] text-[#009B72]"
+                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>payments</span>
                       {f.name}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     {f.kode_akun ? (
                       <div>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/15 text-white text-xs font-mono font-semibold">
-                          {f.kode_akun}
-                        </span>
-                        <p className="text-xs text-white/60 mt-0.5 leading-tight">{getBasUraian(f.kode_akun)}</p>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/10 text-white/80 text-xs font-mono font-semibold border border-white/10">{f.kode_akun}</span>
+                        <p className="text-xs text-white/40 mt-0.5 leading-tight">{getBasUraian(f.kode_akun)}</p>
                       </div>
                     ) : (
-                      <span className="text-xs text-white/40 italic">— Belum dipetakan —</span>
+                      <span className="text-xs text-white/25 italic">— Belum dipetakan —</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <button className="text-xs text-primary hover:underline disabled:opacity-50" disabled={saving}
-                        onClick={() => openEdit(f.id, f.kode_akun)}>
-                        Edit
-                      </button>
-                      <button className="text-xs text-error hover:underline disabled:opacity-50" disabled={saving}
-                        onClick={() => openDel(f.id, f.name)}>
-                        Hapus
-                      </button>
+                      <ThemeButton variant="text-primary" disabled={saving} onClick={() => openEdit(f.id, f.kode_akun)}>Edit</ThemeButton>
+                      <ThemeButton variant="text-danger" disabled={saving} onClick={() => openDel(f.id, f.name)}>Hapus</ThemeButton>
                     </div>
                   </td>
                 </tr>
@@ -758,7 +911,7 @@ function JenisPendapatanTab() {
             </tbody>
           </table>
         )}
-      </Card>
+      </ThemeCard>
 
       {/* Modal Tambah */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Jenis Pendapatan" maxWidth="md">
@@ -766,34 +919,30 @@ function JenisPendapatanTab() {
           <FormField label="Kode Akun BAS Pendapatan BLU" icon="tag">
             <select className={inputCls} value={addKodeAkun}
               onChange={e => { setAddKodeAkun(e.target.value); setFormError(null) }} autoFocus>
-              <option value="">— Pilih Kode Akun —</option>
+              <option value="" className="bg-[#1a2236]">— Pilih Kode Akun —</option>
               {BAS_PENDAPATAN_BLU.map(g => (
                 <optgroup key={g.group} label={g.group}>
                   {g.items.map(item => (
-                    <option key={item.kode} value={item.kode}>
-                      {item.kode} — {item.uraian}
-                    </option>
+                    <option key={item.kode} value={item.kode} className="bg-[#1a2236]">{item.kode} — {item.uraian}</option>
                   ))}
                 </optgroup>
               ))}
             </select>
             {addKodeAkun && (
-              <p className="text-xs text-on-surface-variant mt-1">
-                Akan disimpan sebagai:{' '}
-                <span className="font-semibold text-on-surface">{getBasUraian(addKodeAkun)}</span>
-              </p>
+              <p className="text-xs text-white/50 mt-1.5">Akan disimpan sebagai: <span className="font-semibold text-white">{getBasUraian(addKodeAkun)}</span></p>
             )}
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
               <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleAdd}>
+            <ThemeButton variant="text-primary" onClick={() => setAddOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleAdd}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -804,34 +953,30 @@ function JenisPendapatanTab() {
           <FormField label="Kode Akun BAS Pendapatan BLU" icon="tag">
             <select className={inputCls} value={editKodeAkun}
               onChange={e => { setEditKodeAkun(e.target.value); setFormError(null) }} autoFocus>
-              <option value="">— Pilih Kode Akun —</option>
+              <option value="" className="bg-[#1a2236]">— Pilih Kode Akun —</option>
               {BAS_PENDAPATAN_BLU.map(g => (
                 <optgroup key={g.group} label={g.group}>
                   {g.items.map(item => (
-                    <option key={item.kode} value={item.kode}>
-                      {item.kode} — {item.uraian}
-                    </option>
+                    <option key={item.kode} value={item.kode} className="bg-[#1a2236]">{item.kode} — {item.uraian}</option>
                   ))}
                 </optgroup>
               ))}
             </select>
             {editKodeAkun && (
-              <p className="text-xs text-on-surface-variant mt-1">
-                Akan disimpan sebagai:{' '}
-                <span className="font-semibold text-on-surface">{getBasUraian(editKodeAkun)}</span>
-              </p>
+              <p className="text-xs text-white/50 mt-1.5">Akan disimpan sebagai: <span className="font-semibold text-white">{getBasUraian(editKodeAkun)}</span></p>
             )}
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
               <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleEdit}>
+            <ThemeButton variant="text-primary" onClick={() => setEditOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleEdit}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -839,23 +984,22 @@ function JenisPendapatanTab() {
       {/* Modal Hapus */}
       <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Jenis Pendapatan">
         <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-on-surface-variant font-body">
-            Yakin ingin menghapus jenis pendapatan{' '}
-            <span className="font-semibold text-on-surface">"{delName}"</span>?
+          <p className="text-sm text-white/60 font-body">
+            Yakin ingin menghapus jenis pendapatan <span className="font-semibold text-white">"{delName}"</span>?
           </p>
-          <p className="text-xs text-on-surface-variant font-body bg-surface-container rounded-lg px-3 py-2">
+          <p className="text-xs text-white/40 font-body bg-white/5 rounded-lg px-3 py-2 border border-white/10">
             Jika masih digunakan oleh transaksi, penghapusan akan gagal secara otomatis.
           </p>
           {delError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
               <span className="material-symbols-outlined text-[1rem]">error</span>{delError}
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" className="bg-error text-on-error hover:bg-error/90" disabled={saving} onClick={handleDelete}>
+            <ThemeButton variant="text-primary" onClick={() => setDelOpen(false)}>Batal</ThemeButton>
+            <ThemeButton variant="danger" disabled={saving} onClick={handleDelete}>
               {saving ? 'Menghapus...' : 'Hapus'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -935,74 +1079,57 @@ function MekanismeBisnisTab() {
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Mekanisme Bisnis</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
-              {businessUnits.length} mekanisme terdaftar
-            </p>
+      <ThemeCard>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E293B]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>business_center</span>
+            <div>
+              <h3 className="text-sm font-semibold text-white font-headline">Mekanisme Bisnis</h3>
+              <p className="text-xs text-white/40 font-body">{businessUnits.length} mekanisme terdaftar</p>
+            </div>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
+          <ThemeButton onClick={openAdd}>
+            <span className="material-symbols-outlined text-base">add</span>
             Tambah Mekanisme
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
-            {success}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">{success}</div>
         )}
         {error && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">
-            {error}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">{error}</div>
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Memuat...</p>
         ) : businessUnits.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
-            Belum ada mekanisme bisnis. Klik "Tambah Mekanisme" untuk menambahkan.
-          </p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Belum ada mekanisme bisnis. Klik "Tambah Mekanisme" untuk menambahkan.</p>
         ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
-              <tr>
+          <table className="w-full text-sm font-body">
+            <thead>
+              <tr className="border-b border-white/10">
                 {['No', 'Nama Mekanisme Bisnis', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
+                  <th key={h} className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {businessUnits.map((b, idx) => (
-                <tr key={b.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface-variant text-xs w-12">{idx + 1}</td>
-                  <td className="px-4 py-2.5 text-on-surface font-medium">
+                <tr key={b.id} className={idx % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                  <td className="px-5 py-3.5 text-white/40 text-xs w-12">{idx + 1}</td>
+                  <td className="px-5 py-3.5 text-white font-medium">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-secondary"
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                        business_center
-                      </span>
+                      <span className="material-symbols-outlined text-[16px] text-[#009B72]"
+                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>business_center</span>
                       {b.name}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <button
-                        className="text-xs text-primary hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => openEdit(b.id, b.name)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-xs text-error hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => openDel(b.id, b.name)}
-                      >
-                        Hapus
-                      </button>
+                      <ThemeButton variant="text-primary" disabled={saving} onClick={() => openEdit(b.id, b.name)}>Edit</ThemeButton>
+                      <ThemeButton variant="text-danger" disabled={saving} onClick={() => openDel(b.id, b.name)}>Hapus</ThemeButton>
                     </div>
                   </td>
                 </tr>
@@ -1010,32 +1137,26 @@ function MekanismeBisnisTab() {
             </tbody>
           </table>
         )}
-      </Card>
+      </ThemeCard>
 
       {/* Modal Tambah */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Mekanisme Bisnis">
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Mekanisme Bisnis" icon="business_center">
-            <input
-              type="text"
-              placeholder="Contoh: BLU Pusat"
-              className={inputCls}
-              value={addName}
-              onChange={e => { setAddName(e.target.value); setFormError(null) }}
-              autoFocus
-            />
+            <input type="text" placeholder="Contoh: BLU Pusat" className={inputCls}
+              value={addName} onChange={e => { setAddName(e.target.value); setFormError(null) }} autoFocus />
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {formError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleAdd}>
+            <ThemeButton variant="text-primary" onClick={() => setAddOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleAdd}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -1044,56 +1165,43 @@ function MekanismeBisnisTab() {
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Mekanisme Bisnis">
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Mekanisme Bisnis" icon="business_center">
-            <input
-              type="text"
-              className={inputCls}
-              value={editName}
-              onChange={e => { setEditName(e.target.value); setFormError(null) }}
-              autoFocus
-            />
+            <input type="text" className={inputCls} value={editName}
+              onChange={e => { setEditName(e.target.value); setFormError(null) }} autoFocus />
           </FormField>
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {formError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleEdit}>
+            <ThemeButton variant="text-primary" onClick={() => setEditOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleEdit}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Konfirmasi Hapus */}
+      {/* Modal Hapus */}
       <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Mekanisme Bisnis">
         <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-on-surface-variant font-body">
-            Yakin ingin menghapus mekanisme bisnis{' '}
-            <span className="font-semibold text-on-surface">"{delName}"</span>?
+          <p className="text-sm text-white/60 font-body">
+            Yakin ingin menghapus mekanisme bisnis <span className="font-semibold text-white">"{delName}"</span>?
           </p>
-          <p className="text-xs text-on-surface-variant font-body bg-surface-container rounded-lg px-3 py-2">
+          <p className="text-xs text-white/40 font-body bg-white/5 rounded-lg px-3 py-2 border border-white/10">
             Jika masih terhubung ke kategori penerimaan, penghapusan akan gagal secara otomatis.
           </p>
           {delError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {delError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{delError}
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
-            <Button
-              variant="primary"
-              size="sm"
-              className="bg-error text-on-error hover:bg-error/90"
-              disabled={saving}
-              onClick={handleDelete}
-            >
+            <ThemeButton variant="text-primary" onClick={() => setDelOpen(false)}>Batal</ThemeButton>
+            <ThemeButton variant="danger" disabled={saving} onClick={handleDelete}>
               {saving ? 'Menghapus...' : 'Hapus'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -1163,166 +1271,127 @@ function RekeningTab() {
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Rekening Bank Penerimaan</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
-              {accounts.length} rekening terdaftar
-            </p>
+      <ThemeCard>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E293B]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>account_balance</span>
+            <div>
+              <h3 className="text-sm font-semibold text-white font-headline">Rekening Bank Penerimaan</h3>
+              <p className="text-xs text-white/40 font-body">{accounts.length} rekening terdaftar</p>
+            </div>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openCreate}>
+          <ThemeButton onClick={openCreate}>
+            <span className="material-symbols-outlined text-base">add</span>
             Tambah Rekening
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
-            {success}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">{success}</div>
         )}
         {error && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">
-            {error}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">{error}</div>
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Memuat...</p>
         ) : accounts.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
-            Belum ada rekening. Klik "Tambah Rekening" untuk menambahkan.
-          </p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Belum ada rekening. Klik "Tambah Rekening" untuk menambahkan.</p>
         ) : (
-          <Table>
-            <TableHead>
-              <TableHeadCell>Bank</TableHeadCell>
-              <TableHeadCell>No. Rekening</TableHeadCell>
-              <TableHeadCell>Atas Nama</TableHeadCell>
-              <TableHeadCell>Status</TableHeadCell>
-              <TableHeadCell>Aksi</TableHeadCell>
-            </TableHead>
-            <TableBody>
-              {accounts.map((a, idx) => (
-                <TableRow key={a.id} even={idx % 2 === 0}>
-                  <TableCell><span className="font-medium">{a.bank_name}</span></TableCell>
-                  <TableCell>{a.account_number}</TableCell>
-                  <TableCell>{a.account_name}</TableCell>
-                  <TableCell>
-                    <span className={[
-                      'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                      a.is_active
-                        ? 'bg-primary/20 text-primary'
-                        : 'bg-white/10 text-white/40',
-                    ].join(' ')}>
-                      {a.is_active ? 'Aktif' : 'Nonaktif'}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <button
-                        className="text-xs text-primary hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => openEdit(a)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className={`text-xs hover:underline disabled:opacity-50 ${a.is_active ? 'text-error' : 'text-primary'}`}
-                        disabled={saving}
-                        onClick={() => handleToggle(a.id, a.is_active)}
-                      >
-                        {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                      </button>
-                      <button
-                        className="text-xs text-error hover:underline disabled:opacity-50"
-                        disabled={saving}
-                        onClick={() => setDeleteId(a.id)}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm font-body">
+              <thead>
+                <tr className="border-b border-white/10">
+                  {['Bank', 'No. Rekening', 'Atas Nama', 'Status', 'Aksi'].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((a, idx) => (
+                  <tr key={a.id} className={idx % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                    <td className="px-5 py-3.5 text-white font-medium">{a.bank_name}</td>
+                    <td className="px-5 py-3.5 text-white/70 font-mono text-xs">{a.account_number}</td>
+                    <td className="px-5 py-3.5 text-white/70">{a.account_name}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={[
+                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                        a.is_active ? 'bg-[#009B72]/15 text-[#009B72]' : 'bg-white/10 text-white/40',
+                      ].join(' ')}>
+                        {a.is_active ? 'Aktif' : 'Nonaktif'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <ThemeButton variant="text-primary" disabled={saving} onClick={() => openEdit(a)}>Edit</ThemeButton>
+                        <ThemeButton
+                          variant={a.is_active ? 'text-danger' : 'text-primary'}
+                          disabled={saving}
+                          onClick={() => handleToggle(a.id, a.is_active)}
+                        >
+                          {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                        </ThemeButton>
+                        <ThemeButton variant="text-danger" disabled={saving} onClick={() => setDeleteId(a.id)}>Hapus</ThemeButton>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+      </ThemeCard>
 
       {/* Modal Tambah / Edit */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={modalMode === 'edit' ? 'Edit Rekening Bank' : 'Tambah Rekening Bank'}
-      >
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)}
+        title={modalMode === 'edit' ? 'Edit Rekening Bank' : 'Tambah Rekening Bank'}>
         <div className="px-6 py-5 space-y-4">
           <FormField label="Nama Bank" icon="account_balance">
-            <input
-              type="text"
-              placeholder="Contoh: Bank BRI"
-              className={inputCls}
-              value={form.bank_name}
-              onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))}
-            />
+            <input type="text" placeholder="Contoh: Bank BRI" className={inputCls}
+              value={form.bank_name} onChange={e => setForm(f => ({ ...f, bank_name: e.target.value }))} />
           </FormField>
           <FormField label="Nomor Rekening" icon="tag">
-            <input
-              type="text"
-              placeholder="Contoh: 0001-01-000001-30-7"
-              className={inputCls}
-              value={form.account_number}
-              onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))}
-            />
+            <input type="text" placeholder="Contoh: 0001-01-000001-30-7" className={inputCls}
+              value={form.account_number} onChange={e => setForm(f => ({ ...f, account_number: e.target.value }))} />
           </FormField>
           <FormField label="Atas Nama" icon="badge">
-            <input
-              type="text"
-              placeholder="Contoh: UIN Palopo - Penerimaan UKT"
-              className={inputCls}
-              value={form.account_name}
-              onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))}
-            />
+            <input type="text" placeholder="Contoh: UIN Palopo - Penerimaan UKT" className={inputCls}
+              value={form.account_name} onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))} />
           </FormField>
-
           {formError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
-              <span className="material-symbols-outlined text-[1rem]">error</span>
-              {formError}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
             </div>
           )}
-
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleSave}>
+            <ThemeButton variant="text-primary" onClick={() => setModalOpen(false)}>Batal</ThemeButton>
+            <ThemeButton disabled={saving} onClick={handleSave}>
+              <span className="material-symbols-outlined text-base">save</span>
               {saving ? 'Menyimpan...' : modalMode === 'edit' ? 'Simpan Perubahan' : 'Simpan'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Konfirmasi Hapus */}
+      {/* Modal Hapus */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Hapus Rekening Bank">
         <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-on-surface font-body">
-            Yakin ingin menghapus rekening berikut?
-          </p>
+          <p className="text-sm text-white/60 font-body">Yakin ingin menghapus rekening berikut?</p>
           {deleteTarget && (
-            <div className="rounded-xl bg-surface-container px-4 py-3 text-sm font-body space-y-1">
-              <p><span className="text-on-surface-variant">Bank:</span> <span className="font-medium text-on-surface">{deleteTarget.bank_name}</span></p>
-              <p><span className="text-on-surface-variant">No. Rekening:</span> <span className="font-medium text-on-surface">{deleteTarget.account_number}</span></p>
-              <p><span className="text-on-surface-variant">Atas Nama:</span> <span className="font-medium text-on-surface">{deleteTarget.account_name}</span></p>
+            <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm font-body space-y-1">
+              <p><span className="text-white/40">Bank:</span> <span className="font-medium text-white">{deleteTarget.bank_name}</span></p>
+              <p><span className="text-white/40">No. Rekening:</span> <span className="font-medium text-white">{deleteTarget.account_number}</span></p>
+              <p><span className="text-white/40">Atas Nama:</span> <span className="font-medium text-white">{deleteTarget.account_name}</span></p>
             </div>
           )}
-          <p className="text-xs text-on-surface-variant font-body">
-            Rekening yang dihapus tidak akan muncul di daftar maupun form input transaksi.
-          </p>
+          <p className="text-xs text-white/40 font-body">Rekening yang dihapus tidak akan muncul di daftar maupun form input transaksi.</p>
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setDeleteId(null)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="delete" disabled={saving} onClick={handleDelete}
-              className="bg-error text-on-error hover:bg-error/90">
+            <ThemeButton variant="text-primary" onClick={() => setDeleteId(null)}>Batal</ThemeButton>
+            <ThemeButton variant="danger" disabled={saving} onClick={handleDelete}>
+              <span className="material-symbols-outlined text-base">delete</span>
               {saving ? 'Menghapus...' : 'Hapus'}
-            </Button>
+            </ThemeButton>
           </div>
         </div>
       </Modal>
@@ -1344,14 +1413,14 @@ const KATEGORI_OPTIONS: { value: BendaharaKategori; label: string }[] = [
   { value: 'bendahara_pembantu',   label: 'Bendahara Pengeluaran Pembantu' },
 ]
 
-const inputCls = 'w-full px-3 py-2 rounded-xl border border-outline bg-surface-container-lowest text-sm font-body focus:outline-none focus:ring-2 focus:ring-primary'
+const inputCls = 'w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white font-body focus:outline-none focus:ring-2 focus:ring-[#009B72]/50 focus:border-[#009B72]/50 transition-all placeholder:text-white/30'
 
 function FormField({ label, icon, children }: { label: string; icon: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="flex items-center gap-1 text-xs font-medium text-on-surface-variant font-body mb-1.5">
-        <span className="material-symbols-outlined text-[0.85rem]"
-          style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+      <label className="flex items-center gap-1.5 text-xs font-medium text-white/60 font-body mb-1.5">
+        <span className="material-symbols-outlined text-[0.85rem] text-[#009B72]"
+          style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
           {icon}
         </span>
         {label}
@@ -1384,15 +1453,19 @@ function UserTab({
   const [editOpen, setEditOpen]     = useState(false)
   const [form, setForm]             = useState<CreateUserPayload>(EMPTY_FORM)
   const [editForm, setEditForm]     = useState<EditUserPayload>(EMPTY_EDIT)
+  const [nipCreate, setNipCreate]   = useState('')
+  const [nipEdit, setNipEdit]       = useState('')
   const [saving, setSaving]         = useState(false)
   const [deleting, setDeleting]     = useState<string | null>(null)
   const [error, setError]           = useState<string | null>(null)
   const [editError, setEditError]   = useState<string | null>(null)
   const [success, setSuccess]       = useState<string | null>(null)
 
-  const openModal = () => { setForm(EMPTY_FORM); setError(null); setModalOpen(true) }
+  const openModal = () => { setForm(EMPTY_FORM); setNipCreate(''); setError(null); setModalOpen(true) }
 
   const openEdit = (u: ReturnType<typeof useUsers>['users'][number]) => {
+    const nip = u.email.replace('@uinpalopo.ac.id', '')
+    setNipEdit(nip)
     setEditForm({
       email:    u.email,
       password: '',
@@ -1407,8 +1480,11 @@ function UserTab({
 
   const handleCreate = async () => {
     setError(null)
-    if (!form.email || !form.password || !form.nama) {
-      setError('Email, password, dan nama wajib diisi.'); return
+    if (!nipCreate || nipCreate.length !== 18) {
+      setError('NIP harus 18 digit angka.'); return
+    }
+    if (!form.password || !form.nama) {
+      setError('Nama dan password wajib diisi.'); return
     }
     if (form.password.length < 6) {
       setError('Password minimal 6 karakter.'); return
@@ -1416,12 +1492,13 @@ function UserTab({
     if (form.role === 'Operator' && form.category === 'bendahara_pembantu' && !form.work_unit_id) {
       setError('Unit Kerja wajib dipilih untuk Bendahara Pengeluaran Pembantu.'); return
     }
+    const email = `${nipCreate}@uinpalopo.ac.id`
     setSaving(true)
-    const err = await createUser(form)
+    const err = await createUser({ ...form, email })
     setSaving(false)
     if (err) { setError(err); return }
     setModalOpen(false)
-    setSuccess(`User ${form.email} berhasil dibuat.`)
+    setSuccess(`User NIP ${nipCreate} berhasil dibuat.`)
     usersState.refetch()
     setTimeout(() => setSuccess(null), 4000)
   }
@@ -1458,306 +1535,487 @@ function UserTab({
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Daftar Pengguna</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
-              {usersState.users.length} pengguna terdaftar
-            </p>
-          </div>
-          <Button variant="primary" size="sm" icon="person_add" onClick={openModal}>
+      <div>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-sm text-white/40 font-body">
+            {usersState.users.length} pengguna terdaftar
+          </p>
+          <ThemeButton onClick={openModal}>
+            <span className="material-symbols-outlined text-base">person_add</span>
             Tambah User
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
+          <div className="mb-3 px-4 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-600/30 text-sm text-emerald-400 font-body">
             {success}
           </div>
         )}
         {error && !modalOpen && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">
+          <div className="mb-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">
             {error}
           </div>
         )}
 
-        {usersState.loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
-        ) : usersState.users.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
-            Belum ada pengguna. Klik "Tambah User" untuk membuat yang pertama.
-          </p>
-        ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
-              <tr>
-                {['Email','Role','Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {usersState.users.map((u, idx) => (
-                <tr key={u.userId} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface">{u.email}</td>
-                  <td className="px-4 py-2.5">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary-container text-on-secondary-container">
-                      {USER_ROLE_LABELS[u.role]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {u.userId !== currentUserId ? (
-                      <div className="flex items-center gap-3">
-                        <button
-                          className="text-xs text-primary hover:underline"
-                          onClick={() => openEdit(u)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-xs text-error hover:underline disabled:opacity-50"
-                          disabled={deleting === u.userId}
-                          onClick={() => handleDelete(u.userId, u.email)}
-                        >
-                          {deleting === u.userId ? 'Menghapus...' : 'Hapus'}
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-on-surface-variant italic">Anda</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+        {/* Table */}
+        <ThemeCard>
+          <div className="overflow-x-auto">
+            {usersState.loading ? (
+              <p className="text-center py-10 text-white/40 text-sm font-body">Memuat...</p>
+            ) : (
+              <table className="w-full text-sm font-body">
+                <thead className="text-white/40 uppercase tracking-wide text-xs">
+                  <tr className="border-b border-white/10">
+                    {['NIP', 'Nama', 'Role', 'Aksi'].map(h => (
+                      <th key={h} className="text-left px-6 py-4">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {usersState.users.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-10 text-white/30">
+                        Belum ada pengguna. Klik "Tambah User" untuk membuat yang pertama.
+                      </td>
+                    </tr>
+                  ) : usersState.users.map((u) => {
+                    const nip = u.email.replace('@uinpalopo.ac.id', '')
+                    const isMe = u.userId === currentUserId
+                    return (
+                      <tr key={u.userId} className="border-b border-white/5 hover:bg-white/5 transition-all duration-200">
+                        <td className="px-6 py-4 font-mono text-white/70">{nip}</td>
+                        <td className="px-6 py-4 text-white/90 font-medium">{u.email.split('@')[0]}</td>
+                        <td className="px-6 py-4">
+                          <span className="bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full text-xs">
+                            {USER_ROLE_LABELS[u.role]}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          {isMe ? (
+                            <span className="italic text-white/30">Anda</span>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <button
+                                className="text-blue-400 hover:text-blue-300 transition"
+                                onClick={() => openEdit(u)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-red-400 hover:text-red-300 transition disabled:opacity-40"
+                                disabled={deleting === u.userId}
+                                onClick={() => handleDelete(u.userId, u.email)}
+                              >
+                                {deleting === u.userId ? 'Menghapus...' : 'Hapus'}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </ThemeCard>
+      </div>
 
       {/* Modal edit user */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Pengguna">
-        <div className="px-6 py-5 space-y-5">
-          <div className="space-y-3">
-            <FormField label="Email" icon="alternate_email">
-              <input type="email" className={inputCls + ' opacity-60 cursor-not-allowed'} value={editForm.email} readOnly />
-            </FormField>
-            <FormField label="Nama Lengkap" icon="badge">
-              <input
-                type="text"
-                placeholder="Nama lengkap"
-                className={inputCls}
-                value={editForm.nama}
-                onChange={e => setEditForm(f => ({ ...f, nama: e.target.value }))}
-              />
-            </FormField>
-            <FormField label="Password Baru" icon="lock">
-              <input
-                type="password"
-                placeholder="Kosongkan jika tidak diubah"
-                className={inputCls}
-                value={editForm.password}
-                onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
-              />
-            </FormField>
+        <div className="px-6 py-5 space-y-5 font-body">
+
+          {/* ── NIP (readonly) ── */}
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-1.5">NIP</label>
+            <input
+              type="text"
+              value={nipEdit}
+              readOnly
+              className="w-full px-4 py-2.5 rounded-xl text-sm text-white/40 font-mono tracking-wider
+                bg-white/10 border border-white/10 cursor-not-allowed"
+            />
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <span className="material-symbols-outlined text-[0.85rem] text-white/25">mail</span>
+              <p className="text-[11px] text-white/30">
+                Email: <span className="font-mono text-white/50">{editForm.email}</span>
+              </p>
+            </div>
           </div>
 
-          <div className="border-t border-outline-variant" />
+          {/* ── Nama ── */}
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-1.5">
+              Nama Lengkap <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Nama lengkap"
+              value={editForm.nama}
+              onChange={e => setEditForm(f => ({ ...f, nama: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25
+                bg-white/5 border border-white/10
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                transition-all"
+            />
+          </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-on-surface-variant font-body block mb-2">Role</label>
-              <div className="flex gap-2 flex-wrap">
-                {ROLE_OPTIONS.map(o => (
+          {/* ── Password ── */}
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-1.5">Password Baru</label>
+            <input
+              type="password"
+              placeholder="Kosongkan jika tidak diubah"
+              value={editForm.password ?? ''}
+              onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+              className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25
+                bg-white/5 border border-white/10
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                transition-all"
+            />
+            {(editForm.password?.length ?? 0) > 0 && (editForm.password?.length ?? 0) < 6 && (
+              <p className="text-[11px] text-amber-400/80 mt-1">
+                Password minimal 6 karakter
+              </p>
+            )}
+          </div>
+
+          {/* ── Divider ── */}
+          <div className="border-t border-white/8" />
+
+          {/* ── Role ── */}
+          <div>
+            <label className="block text-xs font-medium text-white/60 mb-2.5">Role</label>
+            <div className="flex gap-2 flex-wrap">
+              {ROLE_OPTIONS.map(o => {
+                const active = editForm.role === o.value
+                const icon = o.value === 'Admin' ? 'admin_panel_settings'
+                  : o.value === 'Approver' ? 'verified_user'
+                  : 'manage_accounts'
+                return (
                   <button
                     key={o.value}
                     type="button"
                     onClick={() => setEditForm(f => ({ ...f, role: o.value }))}
                     className={[
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium font-body border transition-colors',
-                      editForm.role === o.value
-                        ? 'bg-primary text-on-primary border-primary'
-                        : 'bg-surface-container text-on-surface-variant border-outline hover:bg-surface-container-high',
+                      'flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-150',
+                      active
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-900/40'
+                        : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/80',
                     ].join(' ')}
                   >
                     <span className="material-symbols-outlined text-[0.9rem]"
-                      style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                      {o.value === 'Admin' ? 'admin_panel_settings' : o.value === 'Approver' ? 'verified_user' : 'manage_accounts'}
+                      style={{ fontVariationSettings: `'FILL' ${active ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 20` }}>
+                      {icon}
                     </span>
                     {o.label}
                   </button>
-                ))}
-              </div>
+                )
+              })}
             </div>
-
-            {editForm.role === 'Operator' && (
-              <>
-                <FormField label="Kategori Bendahara" icon="category">
-                  <select
-                    className={inputCls}
-                    value={editForm.category}
-                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value as BendaharaKategori }))}
-                  >
-                    {KATEGORI_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </FormField>
-                {editForm.category === 'bendahara_pembantu' && (
-                  <FormField label="Unit Kerja" icon="corporate_fare">
-                    <select
-                      className={inputCls}
-                      value={editForm.work_unit_id}
-                      onChange={e => setEditForm(f => ({ ...f, work_unit_id: e.target.value }))}
-                    >
-                      <option value="">— Pilih Unit Kerja —</option>
-                      {workUnits.map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                )}
-              </>
-            )}
           </div>
 
+          {/* ── Kategori Bendahara ── */}
+          {editForm.role === 'Operator' && (
+            <div className="space-y-3 pl-1 border-l-2 border-emerald-600/30">
+              <div className="pl-3">
+                <label className="block text-xs font-medium text-white/60 mb-1.5">Kategori Bendahara</label>
+                <select
+                  value={editForm.category}
+                  onChange={e => setEditForm(f => ({ ...f, category: e.target.value as BendaharaKategori }))}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm text-white
+                    bg-white/5 border border-white/10
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                    transition-all appearance-none"
+                >
+                  {KATEGORI_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value} className="bg-[#1a2236] text-white">{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {editForm.category === 'bendahara_pembantu' && (
+                <div className="pl-3">
+                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                    Unit Kerja <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={editForm.work_unit_id}
+                    onChange={e => setEditForm(f => ({ ...f, work_unit_id: e.target.value }))}
+                    className="w-full px-4 py-2.5 rounded-xl text-sm text-white
+                      bg-white/5 border border-white/10
+                      focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                      transition-all appearance-none"
+                  >
+                    <option value="" className="bg-[#1a2236]">— Pilih Unit Kerja —</option>
+                    {workUnits.map(u => (
+                      <option key={u.id} value={u.id} className="bg-[#1a2236] text-white">{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Error ── */}
           {editError && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
               <span className="material-symbols-outlined text-[1rem]">error</span>
               {editError}
             </div>
           )}
 
+          {/* ── Actions ── */}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="save" disabled={saving} onClick={handleEdit}>
-              {saving ? 'Menyimpan...' : 'Simpan'}
-            </Button>
+            <button
+              type="button"
+              onClick={() => setEditOpen(false)}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white/50
+                bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70
+                transition-all"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleEdit}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white
+                bg-emerald-600 hover:bg-emerald-500 border border-emerald-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-all shadow-lg shadow-emerald-900/30"
+            >
+              <span className="material-symbols-outlined text-[1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                save
+              </span>
+              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </button>
           </div>
         </div>
       </Modal>
 
       {/* Modal tambah user */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Tambah Pengguna Baru">
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-6 font-body">
 
-          {/* Seksi: Identitas */}
+          {/* ── Seksi: Identitas ── */}
           <div>
-            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest font-body mb-3">
-              Identitas
-            </p>
-            <div className="space-y-3">
-              <FormField label="Nama Lengkap" icon="badge">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-emerald-500 text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                badge
+              </span>
+              <p className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.12em]">
+                Identitas
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Nama */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">
+                  Nama Lengkap <span className="text-red-400">*</span>
+                </label>
                 <input
                   type="text"
                   placeholder="Contoh: Rizal Mappasomba"
-                  className={inputCls}
                   value={form.nama}
                   onChange={e => setForm(f => ({ ...f, nama: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25
+                    bg-white/5 border border-white/10
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                    transition-all"
                 />
-              </FormField>
-              <FormField label="Email" icon="alternate_email">
+              </div>
+
+              {/* NIP */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">
+                  NIP <span className="text-red-400">*</span>
+                  <span className="ml-2 text-white/30 font-normal">18 digit angka</span>
+                </label>
                 <input
-                  type="email"
-                  placeholder="nama@uinpalopo.ac.id"
-                  className={inputCls}
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={18}
+                  placeholder="197711172010011015"
+                  value={nipCreate}
+                  onChange={e => setNipCreate(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25 font-mono tracking-wider
+                    bg-white/5 border border-white/10
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                    transition-all"
                 />
-              </FormField>
-              <FormField label="Password" icon="lock">
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="material-symbols-outlined text-[0.85rem] text-white/25">mail</span>
+                  <p className="text-[11px] text-white/30">
+                    Login via: <span className="font-mono text-white/50">{nipCreate || '...'}</span>@uinpalopo.ac.id
+                  </p>
+                </div>
+                {nipCreate.length > 0 && nipCreate.length !== 18 && (
+                  <p className="text-[11px] text-amber-400/80 mt-1">
+                    {nipCreate.length}/18 digit
+                  </p>
+                )}
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-1.5">
+                  Password <span className="text-red-400">*</span>
+                  <span className="ml-2 text-white/30 font-normal">min. 8 karakter</span>
+                </label>
                 <input
                   type="password"
-                  placeholder="Min. 8 karakter"
-                  className={inputCls}
+                  placeholder="••••••••"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25
+                    bg-white/5 border border-white/10
+                    focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                    transition-all"
                 />
-              </FormField>
+                {form.password.length > 0 && form.password.length < 8 && (
+                  <p className="text-[11px] text-amber-400/80 mt-1">
+                    {form.password.length}/8 karakter minimum
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-outline-variant" />
+          {/* ── Divider ── */}
+          <div className="border-t border-white/8" />
 
-          {/* Seksi: Hak Akses */}
+          {/* ── Seksi: Hak Akses ── */}
           <div>
-            <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest font-body mb-3">
-              Hak Akses
-            </p>
-            <div className="space-y-3">
-              {/* Role pills */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined text-emerald-500 text-[1.1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                shield_person
+              </span>
+              <p className="text-[10px] font-semibold text-white/40 uppercase tracking-[0.12em]">
+                Hak Akses
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Role chips */}
               <div>
-                <label className="text-xs font-medium text-on-surface-variant font-body block mb-2">Role</label>
+                <label className="block text-xs font-medium text-white/60 mb-2.5">Role</label>
                 <div className="flex gap-2 flex-wrap">
-                  {ROLE_OPTIONS.map(o => (
-                    <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, role: o.value }))}
-                      className={[
-                        'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium font-body border transition-colors',
-                        form.role === o.value
-                          ? 'bg-primary text-on-primary border-primary'
-                          : 'bg-surface-container text-on-surface-variant border-outline hover:bg-surface-container-high',
-                      ].join(' ')}
-                    >
-                      <span className="material-symbols-outlined text-[0.9rem]"
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                        {o.value === 'Admin' ? 'admin_panel_settings' : o.value === 'Approver' ? 'verified_user' : 'manage_accounts'}
-                      </span>
-                      {o.label}
-                    </button>
-                  ))}
+                  {ROLE_OPTIONS.map(o => {
+                    const active = form.role === o.value
+                    const icon = o.value === 'Admin' ? 'admin_panel_settings'
+                      : o.value === 'Approver' ? 'verified_user'
+                      : 'manage_accounts'
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, role: o.value }))}
+                        className={[
+                          'flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-150',
+                          active
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-900/40'
+                            : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10 hover:text-white/80',
+                        ].join(' ')}
+                      >
+                        <span className="material-symbols-outlined text-[0.9rem]"
+                          style={{ fontVariationSettings: `'FILL' ${active ? 1 : 0}, 'wght' 400, 'GRAD' 0, 'opsz' 20` }}>
+                          {icon}
+                        </span>
+                        {o.label}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
+              {/* Kategori Bendahara — tampil jika role = Operator */}
               {form.role === 'Operator' && (
-                <>
-                  <FormField label="Kategori Bendahara" icon="category">
+                <div className="space-y-3 pl-1 border-l-2 border-emerald-600/30">
+                  <div className="pl-3">
+                    <label className="block text-xs font-medium text-white/60 mb-1.5">
+                      Kategori Bendahara
+                    </label>
                     <select
-                      className={inputCls}
                       value={form.category}
                       onChange={e => setForm(f => ({ ...f, category: e.target.value as BendaharaKategori }))}
+                      className="w-full px-4 py-2.5 rounded-xl text-sm text-white
+                        bg-white/5 border border-white/10
+                        focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                        transition-all appearance-none"
                     >
                       {KATEGORI_OPTIONS.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
+                        <option key={o.value} value={o.value} className="bg-[#1a2236] text-white">
+                          {o.label}
+                        </option>
                       ))}
                     </select>
-                  </FormField>
+                  </div>
 
                   {form.category === 'bendahara_pembantu' && (
-                    <FormField label="Unit Kerja" icon="corporate_fare">
+                    <div className="pl-3">
+                      <label className="block text-xs font-medium text-white/60 mb-1.5">
+                        Unit Kerja <span className="text-red-400">*</span>
+                      </label>
                       <select
-                        className={inputCls}
                         value={form.work_unit_id}
                         onChange={e => setForm(f => ({ ...f, work_unit_id: e.target.value }))}
+                        className="w-full px-4 py-2.5 rounded-xl text-sm text-white
+                          bg-white/5 border border-white/10
+                          focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+                          transition-all appearance-none"
                       >
-                        <option value="">— Pilih Unit Kerja —</option>
+                        <option value="" className="bg-[#1a2236]">— Pilih Unit Kerja —</option>
                         {workUnits.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
+                          <option key={u.id} value={u.id} className="bg-[#1a2236] text-white">{u.name}</option>
                         ))}
                       </select>
-                    </FormField>
+                    </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Error */}
+          {/* ── Error ── */}
           {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-error-container text-on-error-container text-sm font-body">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
               <span className="material-symbols-outlined text-[1rem]">error</span>
               {error}
             </div>
           )}
 
-          {/* Actions */}
+          {/* ── Actions ── */}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="secondary" size="sm" onClick={() => setModalOpen(false)}>Batal</Button>
-            <Button variant="primary" size="sm" icon="person_add" disabled={saving} onClick={handleCreate}>
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-sm font-medium text-white/50
+                bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70
+                transition-all"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleCreate}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white
+                bg-emerald-600 hover:bg-emerald-500 border border-emerald-600
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-all shadow-lg shadow-emerald-900/30"
+            >
+              <span className="material-symbols-outlined text-[1rem]"
+                style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                person_add
+              </span>
               {saving ? 'Membuat...' : 'Buat User'}
-            </Button>
+            </button>
           </div>
         </div>
       </Modal>
@@ -1830,176 +2088,241 @@ function SumberPendapatanBisnisTab() {
     setDelOpen(false); flash(`Sumber pendapatan "${delName}" berhasil dihapus.`); refetch()
   }
 
+  const darkInput = `w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/25
+    bg-white/5 border border-white/10
+    focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+    transition-all`
+
   const formFieldsJsx = (
-    <div className="space-y-3 px-6 py-4">
+    <div className="space-y-4 px-6 py-5 font-body">
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">Nama <span className="text-error">*</span></label>
+        <label className="block text-xs font-medium text-white/60 mb-1.5">
+          Nama <span className="text-red-400">*</span>
+        </label>
         <input
           type="text"
           placeholder="Contoh: Pendapatan Jasa Layanan"
           value={formName}
           onChange={e => { setFormName(e.target.value); setFormError(null) }}
-          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+          className={darkInput}
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">Kode <span className="text-on-surface-variant font-normal">(opsional)</span></label>
+        <label className="block text-xs font-medium text-white/60 mb-1.5">
+          Kode <span className="text-white/30 font-normal">(opsional)</span>
+        </label>
         <input
           type="text"
           placeholder="Contoh: SPB-001"
           value={formKode}
           onChange={e => setFormKode(e.target.value)}
-          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary font-mono"
+          className={darkInput + ' font-mono tracking-wider'}
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">Deskripsi <span className="text-on-surface-variant font-normal">(opsional)</span></label>
+        <label className="block text-xs font-medium text-white/60 mb-1.5">
+          Deskripsi <span className="text-white/30 font-normal">(opsional)</span>
+        </label>
         <textarea
           rows={2}
           placeholder="Keterangan singkat tentang sumber pendapatan ini"
           value={formDeskripsi}
           onChange={e => setFormDeskripsi(e.target.value)}
-          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary resize-none"
+          className={darkInput + ' resize-none'}
         />
       </div>
       {formError && (
-        <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{formError}</p>
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+          <span className="material-symbols-outlined text-[1rem]">error</span>
+          {formError}
+        </div>
       )}
+    </div>
+  )
+
+  const modalActions = (onCancel: () => void, onConfirm: () => void, confirmLabel: string) => (
+    <div className="flex justify-end gap-2 px-6 pb-5">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="px-4 py-2 rounded-xl text-sm font-medium text-white/50
+          bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70
+          transition-all font-body"
+      >
+        Batal
+      </button>
+      <button
+        type="button"
+        disabled={saving}
+        onClick={onConfirm}
+        className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white
+          bg-emerald-600 hover:bg-emerald-500 border border-emerald-600
+          disabled:opacity-50 disabled:cursor-not-allowed
+          transition-all shadow-lg shadow-emerald-900/30 font-body"
+      >
+        {saving ? 'Menyimpan...' : confirmLabel}
+      </button>
     </div>
   )
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface font-headline">Sumber Pendapatan Bisnis</h3>
-            <p className="text-xs text-on-surface-variant font-body mt-0.5">
-              {items.length} sumber terdaftar
-            </p>
-          </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
-            Tambah Sumber
-          </Button>
+      {/* ── Header ── */}
+      <div className="flex justify-between items-center mb-4">
+        <p className="text-sm text-white/40 font-body">
+          {items.length} sumber terdaftar
+        </p>
+        <ThemeButton onClick={openAdd}>
+          <span className="material-symbols-outlined text-base">add</span>
+          Tambah Sumber
+        </ThemeButton>
+      </div>
+
+      {success && (
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-emerald-600/20 border border-emerald-600/30 text-sm text-emerald-400 font-body">
+          {success}
         </div>
+      )}
+      {error && (
+        <div className="mb-3 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-body">
+          {error}
+        </div>
+      )}
 
-        {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">{success}</div>
-        )}
-        {error && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-error-container text-sm text-on-error-container font-body">{error}</div>
-        )}
-
-        {loading ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">Memuat...</p>
-        ) : items.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-on-surface-variant font-body text-center">
-            Belum ada sumber pendapatan bisnis. Klik "Tambah Sumber" untuk menambahkan.
-          </p>
-        ) : (
-          <table className="w-full text-sm font-body mt-1">
-            <thead className="bg-surface-container-low">
-              <tr>
-                {['No', 'Nama', 'Kode', 'Deskripsi', 'Aksi'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-on-surface-variant uppercase tracking-label font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={item.id} className={idx % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'}>
-                  <td className="px-4 py-2.5 text-on-surface-variant text-xs w-12">{idx + 1}</td>
-                  <td className="px-4 py-2.5 text-on-surface font-medium">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] text-tertiary"
-                        style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                        account_balance
-                      </span>
-                      {item.name}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {item.kode ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container text-on-secondary-container text-xs font-mono font-semibold">
-                        {item.kode}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-on-surface-variant italic">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-on-surface-variant max-w-xs truncate">
-                    {item.deskripsi || <span className="italic">—</span>}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEdit(item.id, item.name, item.kode, item.deskripsi)}
-                        className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                        title="Edit"
-                      >
-                        <span className="material-symbols-outlined text-[16px]"
-                          style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                          edit
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => openDel(item.id, item.name)}
-                        className="p-1.5 rounded-lg text-error hover:bg-error-container transition-colors"
-                        title="Hapus"
-                      >
-                        <span className="material-symbols-outlined text-[16px]"
-                          style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                          delete
-                        </span>
-                      </button>
-                    </div>
-                  </td>
+      {/* ── Tabel ── */}
+      <ThemeCard>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <p className="text-center py-10 text-white/40 text-sm font-body">Memuat...</p>
+          ) : (
+            <table className="w-full text-sm font-body">
+              <thead className="text-white/40 uppercase tracking-wide text-xs">
+                <tr className="border-b border-white/10">
+                  {['No', 'Nama', 'Kode', 'Deskripsi', 'Aksi'].map(h => (
+                    <th key={h} className="text-left px-5 py-3">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-2 text-white/30">
+                        <span className="material-symbols-outlined text-3xl"
+                          style={{ fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}>
+                          account_balance
+                        </span>
+                        <p>Belum ada sumber pendapatan bisnis</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : items.map((item, idx) => (
+                  <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-all duration-150">
+                    <td className="px-5 py-4 text-white/30 text-xs w-12">{idx + 1}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[16px] text-white/30"
+                          style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                          account_balance
+                        </span>
+                        <span className="text-white/90 font-medium">{item.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      {item.kode ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-white/10 text-white/70 text-xs font-mono font-semibold border border-white/10">
+                          {item.kode}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-white/25 italic">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-white/40 max-w-xs truncate">
+                      {item.deskripsi || <span className="italic">—</span>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEdit(item.id, item.name, item.kode, item.deskripsi)}
+                          className="text-white/40 hover:text-blue-400 transition"
+                          title="Edit"
+                        >
+                          <span className="material-symbols-outlined text-[16px]"
+                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                            edit
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => openDel(item.id, item.name)}
+                          className="text-white/40 hover:text-red-400 transition"
+                          title="Hapus"
+                        >
+                          <span className="material-symbols-outlined text-[16px]"
+                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+                            delete
+                          </span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </ThemeCard>
 
       {/* Modal Tambah */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Sumber Pendapatan Bisnis" maxWidth="sm">
         {formFieldsJsx}
-        <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleAdd}>
-            {saving ? 'Menyimpan...' : 'Simpan'}
-          </Button>
-        </div>
+        {modalActions(() => setAddOpen(false), handleAdd, 'Simpan')}
       </Modal>
 
       {/* Modal Edit */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Sumber Pendapatan Bisnis" maxWidth="sm">
         {formFieldsJsx}
-        <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleEdit}>
-            {saving ? 'Menyimpan...' : 'Perbarui'}
-          </Button>
-        </div>
+        {modalActions(() => setEditOpen(false), handleEdit, 'Perbarui')}
       </Modal>
 
       {/* Modal Hapus */}
-      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Sumber Pendapatan Bisnis" maxWidth="sm">
-        <div className="px-6 py-4 space-y-3">
-          <p className="text-sm text-on-surface">
-            Hapus sumber pendapatan <span className="font-semibold">"{delName}"</span>?
+      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Sumber Pendapatan?" maxWidth="sm">
+        <div className="px-6 py-5 space-y-3 font-body">
+          <p className="text-sm text-white/70">
+            Hapus sumber pendapatan <span className="font-semibold text-white">"{delName}"</span>?
             Transaksi yang sudah menggunakan sumber ini tidak akan terpengaruh.
           </p>
           {delError && (
-            <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{delError}</p>
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+              <span className="material-symbols-outlined text-[1rem]">error</span>
+              {delError}
+            </div>
           )}
         </div>
         <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleDelete}
-            className="!bg-error !text-on-error">
+          <button
+            type="button"
+            onClick={() => setDelOpen(false)}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-white/50
+              bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white/70
+              transition-all font-body"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleDelete}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-medium text-white
+              bg-red-600 hover:bg-red-500 border border-red-600
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all shadow-lg shadow-red-900/30 font-body"
+          >
+            <span className="material-symbols-outlined text-[1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
+              delete
+            </span>
             {saving ? 'Menghapus...' : 'Hapus'}
-          </Button>
+          </button>
         </div>
       </Modal>
     </>
@@ -2074,73 +2397,74 @@ function UnitKerjaTab() {
   const formFieldsJsx = (
     <div className="px-6 py-4 space-y-4">
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">
-          Nama Unit Kerja <span className="text-error">*</span>
+        <label className="block text-xs font-medium text-white/60 mb-1.5">
+          Nama Unit Kerja <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
           placeholder="Contoh: FUAD, FTIK, LP2M"
           value={formName}
           onChange={e => { setFormName(e.target.value); setFormError(null) }}
-          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+          className={inputCls}
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-on-surface-variant mb-1">
-          Induk Unit Kerja <span className="text-on-surface-variant font-normal">(opsional)</span>
+        <label className="block text-xs font-medium text-white/60 mb-1.5">
+          Induk Unit Kerja <span className="text-white/40 font-normal">(opsional)</span>
         </label>
         <select
           value={parentId}
           onChange={e => setParentId(e.target.value)}
-          className="w-full rounded-xl border border-outline-variant bg-surface-container px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+          className={inputCls}
         >
-          <option value="">— Tidak ada (unit utama) —</option>
+          <option value="" className="bg-[#1a2236]">— Tidak ada (unit utama) —</option>
           {roots.filter(r => r.id !== editId).map(r => (
-            <option key={r.id} value={r.id}>{r.name}</option>
+            <option key={r.id} value={r.id} className="bg-[#1a2236]">{r.name}</option>
           ))}
         </select>
       </div>
       {formError && (
-        <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{formError}</p>
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-body">
+          <span className="material-symbols-outlined text-[1rem]">error</span>{formError}
+        </div>
       )}
     </div>
   )
 
   return (
     <>
-      <Card padding="sm">
-        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-white font-headline">Unit Kerja</h3>
-            <p className="text-xs text-white/60 font-body mt-0.5">
-              {workUnits.length} unit terdaftar
-            </p>
+      <ThemeCard>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E293B]">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#009B72] text-[1.1rem]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>corporate_fare</span>
+            <div>
+              <h3 className="text-sm font-semibold text-white font-headline">Unit Kerja</h3>
+              <p className="text-xs text-white/40 font-body">{workUnits.length} unit terdaftar</p>
+            </div>
           </div>
-          <Button variant="primary" size="sm" icon="add" onClick={openAdd}>
+          <ThemeButton onClick={openAdd}>
+            <span className="material-symbols-outlined text-base">add</span>
             Tambah Unit Kerja
-          </Button>
+          </ThemeButton>
         </div>
 
         {success && (
-          <div className="mx-4 mb-2 px-3 py-2 rounded-xl bg-primary-fixed/30 text-sm text-primary font-body">
-            {success}
-          </div>
+          <div className="mx-5 mt-3 px-4 py-2.5 rounded-xl bg-[#009B72]/10 border border-[#009B72]/30 text-sm text-[#009B72] font-body">{success}</div>
         )}
 
         {loading ? (
-          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">Memuat...</p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Memuat...</p>
         ) : workUnits.length === 0 ? (
-          <p className="px-4 py-8 text-sm text-white/60 font-body text-center">
-            Belum ada unit kerja. Klik "Tambah Unit Kerja" untuk menambahkan.
-          </p>
+          <p className="py-10 text-sm text-white/40 font-body text-center">Belum ada unit kerja. Klik "Tambah Unit Kerja" untuk menambahkan.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm font-body">
             <thead>
-              <tr className="border-b border-white/20 bg-white/10">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Nama Unit Kerja</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Induk</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wide">Sub-Unit</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-white uppercase tracking-wide">Aksi</th>
+              <tr className="border-b border-white/10">
+                <th className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">Nama Unit Kerja</th>
+                <th className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">Induk</th>
+                <th className="px-5 py-3 text-left text-xs text-white/40 uppercase tracking-wide font-medium">Sub-Unit</th>
+                <th className="px-5 py-3 text-right text-xs text-white/40 uppercase tracking-wide font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -2148,44 +2472,26 @@ function UnitKerjaTab() {
                 const parent = workUnits.find(p => p.id === u.parent_id)
                 const subCount = children.filter(c => c.parent_id === u.id).length
                 return (
-                  <tr key={u.id} className={idx % 2 === 0 ? 'bg-white/5' : ''}>
-                    <td className="px-4 py-2.5">
+                  <tr key={u.id} className={idx % 2 === 0 ? '' : 'bg-white/[0.02]'}>
+                    <td className="px-5 py-3.5">
                       <span className="font-semibold text-white">{u.name}</span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-3.5">
                       {parent
-                        ? <span className="text-white/80">{parent.name}</span>
-                        : <span className="text-white/30 italic">—</span>
+                        ? <span className="text-white/70">{parent.name}</span>
+                        : <span className="text-white/25 italic">—</span>
                       }
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-5 py-3.5">
                       {subCount > 0
-                        ? <span className="text-xs bg-primary/30 text-primary-container px-2 py-0.5 rounded-full font-medium">{subCount} sub-unit</span>
-                        : <span className="text-white/30">—</span>
+                        ? <span className="text-xs bg-[#009B72]/15 text-[#009B72] px-2.5 py-0.5 rounded-full font-medium">{subCount} sub-unit</span>
+                        : <span className="text-white/25">—</span>
                       }
                     </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEdit(u)}
-                          className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
-                          title="Edit"
-                        >
-                          <span className="material-symbols-outlined text-[16px]"
-                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                            edit
-                          </span>
-                        </button>
-                        <button
-                          onClick={() => openDel(u.id, u.name)}
-                          className="p-1.5 rounded-lg text-error hover:bg-error-container transition-colors"
-                          title="Hapus"
-                        >
-                          <span className="material-symbols-outlined text-[16px]"
-                            style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}>
-                            delete
-                          </span>
-                        </button>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-end gap-3">
+                        <ThemeButton variant="text-primary" onClick={() => openEdit(u)}>Edit</ThemeButton>
+                        <ThemeButton variant="text-danger" onClick={() => openDel(u.id, u.name)}>Hapus</ThemeButton>
                       </div>
                     </td>
                   </tr>
@@ -2194,16 +2500,17 @@ function UnitKerjaTab() {
             </tbody>
           </table>
         )}
-      </Card>
+      </ThemeCard>
 
       {/* Modal Tambah */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Tambah Unit Kerja" maxWidth="sm">
         {formFieldsJsx}
         <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleAdd}>
+          <ThemeButton variant="text-primary" onClick={() => setAddOpen(false)}>Batal</ThemeButton>
+          <ThemeButton disabled={saving} onClick={handleAdd}>
+            <span className="material-symbols-outlined text-base">save</span>
             {saving ? 'Menyimpan...' : 'Simpan'}
-          </Button>
+          </ThemeButton>
         </div>
       </Modal>
 
@@ -2211,30 +2518,32 @@ function UnitKerjaTab() {
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Unit Kerja" maxWidth="sm">
         {formFieldsJsx}
         <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleEdit}>
+          <ThemeButton variant="text-primary" onClick={() => setEditOpen(false)}>Batal</ThemeButton>
+          <ThemeButton disabled={saving} onClick={handleEdit}>
+            <span className="material-symbols-outlined text-base">save</span>
             {saving ? 'Menyimpan...' : 'Perbarui'}
-          </Button>
+          </ThemeButton>
         </div>
       </Modal>
 
       {/* Modal Hapus */}
       <Modal open={delOpen} onClose={() => setDelOpen(false)} title="Hapus Unit Kerja" maxWidth="sm">
         <div className="px-6 py-4 space-y-3">
-          <p className="text-sm text-on-surface">
-            Hapus unit kerja <span className="font-semibold">"{delName}"</span>?
+          <p className="text-sm text-white/60 font-body">
+            Hapus unit kerja <span className="font-semibold text-white">"{delName}"</span>?
             Transaksi yang sudah menggunakan unit ini tidak akan terpengaruh.
           </p>
           {delError && (
-            <p className="text-xs text-error bg-error-container rounded-lg px-3 py-2">{delError}</p>
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-body">
+              <span className="material-symbols-outlined text-[1rem]">error</span>{delError}
+            </div>
           )}
         </div>
         <div className="flex justify-end gap-2 px-6 pb-5">
-          <Button variant="ghost" size="sm" onClick={() => setDelOpen(false)}>Batal</Button>
-          <Button variant="primary" size="sm" disabled={saving} onClick={handleDelete}
-            className="!bg-error !text-on-error">
+          <ThemeButton variant="text-primary" onClick={() => setDelOpen(false)}>Batal</ThemeButton>
+          <ThemeButton variant="danger" disabled={saving} onClick={handleDelete}>
             {saving ? 'Menghapus...' : 'Hapus'}
-          </Button>
+          </ThemeButton>
         </div>
       </Modal>
     </>

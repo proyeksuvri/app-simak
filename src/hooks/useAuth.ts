@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseFunctionsUrl } from '../lib/supabase'
 import type { User, UserRole } from '../types'
-
-const FN_URL = 'https://bqlrbdzmexmjcumechmt.supabase.co/functions/v1'
 
 interface AuthState {
   session:  Session | null
@@ -23,13 +21,17 @@ function mapToAppRole(roleName: string, categoryName?: string | null): UserRole 
   return 'admin' // fallback
 }
 
+function deriveNipFromEmail(email: string): string {
+  return email.split('@')[0] ?? ''
+}
+
 async function fetchProfile(userId: string): Promise<User | null> {
   // Prefer backend profile endpoint for precise role/category mapping.
   const { data: sess } = await supabase.auth.getSession()
   const accessToken = sess.session?.access_token ?? ''
   if (accessToken) {
     try {
-      const res = await fetch(`${FN_URL}/get-user-profile`, {
+      const res = await fetch(`${supabaseFunctionsUrl}/get-user-profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,7 +50,7 @@ async function fetchProfile(userId: string): Promise<User | null> {
           email,
           role: mapToAppRole(roleName, categoryName),
           unitId: body.work_unit_id ? String(body.work_unit_id) : null,
-          nip: '',
+          nip: String(body.nip || deriveNipFromEmail(email)),
         }
       }
     } catch {
@@ -58,22 +60,24 @@ async function fetchProfile(userId: string): Promise<User | null> {
 
   // Legacy fallback:
   // 1. Ambil user_tenant
-  const { data: ut, error: utErr } = await supabase
+  const { data: utRaw, error: utErr } = await supabase
     .from('user_tenants')
     .select('role_id, tenant_id')
     .eq('user_id', userId)
     .single()
+  const ut = utRaw as { role_id: string | null; tenant_id: string | null } | null
 
   if (utErr || !ut) return null
 
   // 2. Ambil nama role secara terpisah
   let roleName = ''
   if (ut.role_id) {
-    const { data: role } = await supabase
+    const { data: roleRaw } = await supabase
       .from('roles')
       .select('name')
       .eq('id', ut.role_id)
       .single()
+    const role = roleRaw as { name: string | null } | null
     roleName = role?.name ?? ''
   }
 
@@ -108,7 +112,7 @@ async function fetchProfile(userId: string): Promise<User | null> {
     email,
     role:   mapToAppRole(roleName, categoryName),
     unitId: null,
-    nip:    '',
+    nip:    deriveNipFromEmail(email),
   }
 }
 
@@ -155,7 +159,7 @@ export function useAuth() {
 
     // onAuthStateChange di Supabase v2 fire langsung dengan INITIAL_SESSION
     // → set loading:false segera setelah session diketahui, fetch profile di background
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       resolved = true
       clearTimeout(timeout)
 

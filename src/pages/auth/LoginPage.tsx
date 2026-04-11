@@ -6,9 +6,11 @@ import logoUinPalopo from '../../assets/logo-uinpalopo.png'
 
 export function LoginPage() {
   const { session, authLoading, signIn, setTahunAnggaran } = useAppContext()
-  const [email,          setEmail]          = useState('')
+  const [nip,            setNip]            = useState('')
+  const [nipError,       setNipError]       = useState<string | null>(null)
   const [password,       setPassword]       = useState('')
   const [showPassword,   setShowPassword]   = useState(false)
+  const [capsLock,       setCapsLock]       = useState(false)
   const [tahunPilihan,   setTahunPilihan]   = useState(2026)
   const [availableYears, setAvailableYears] = useState<number[]>([2026])
   const [submitting,     setSubmitting]     = useState(false)
@@ -29,39 +31,62 @@ export function LoginPage() {
       })
   }, [])
 
-  if (authLoading) return null
+  if (authLoading && !submitting) return null
   if (session) return <Navigate to="/dashboard" replace />
+
+  const validateNip = (value: string): string | null => {
+    if (!value) return 'NIP wajib diisi'
+    if (value.length !== 18) return 'NIP harus 18 digit angka'
+    return null
+  }
+
+  const handleNipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '')
+    setNip(digits)
+    if (nipError) setNipError(validateNip(digits))
+  }
+
+  const handleNipBlur = () => {
+    setNipError(validateNip(nip))
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const nipErr = validateNip(nip)
+    if (nipErr) { setNipError(nipErr); return }
     setError(null)
     setSubmitting(true)
+    const email = `${nip}@uinpalopo.ac.id`
     const ok = await signIn(email, password)
     if (ok) {
       setTahunAnggaran(tahunPilihan)
     } else {
-      setError('Email atau kata sandi salah. Periksa kembali.')
+      setError('NIP atau kata sandi tidak valid')
     }
     setSubmitting(false)
   }
 
   // ── Dark theme tokens ──────────────────────────────────────────────────────
   const dk = {
-    bg:          '#09090b',          // zinc-950
+    bg:          '#09090b',
     bgCard:      'rgba(255,255,255,0.04)',
     bgInput:     'rgba(255,255,255,0.06)',
     border:      'rgba(255,255,255,0.08)',
-    borderFocus: 'rgba(99,102,241,0.6)',  // indigo focus ring
-    text:        '#f4f4f5',          // zinc-100
+    borderFocus: 'rgba(99,102,241,0.6)',
+    borderError: 'rgba(239,68,68,0.5)',
+    text:        '#f4f4f5',
     textMuted:   'rgba(244,244,245,0.45)',
     textSubtle:  'rgba(244,244,245,0.25)',
-    accent:      '#6366f1',          // indigo-500
-    accentHover: '#818cf8',          // indigo-400
+    accent:      '#6366f1',
+    accentHover: '#818cf8',
     accentDim:   'rgba(99,102,241,0.15)',
     divider:     'rgba(255,255,255,0.06)',
     errorBg:     'rgba(239,68,68,0.12)',
     errorBorder: 'rgba(239,68,68,0.3)',
     errorText:   '#fca5a5',
+    warnBg:      'rgba(234,179,8,0.1)',
+    warnBorder:  'rgba(234,179,8,0.3)',
+    warnText:    '#fde047',
   } as const
 
   return (
@@ -73,7 +98,7 @@ export function LoginPage() {
           <img
             className="w-full h-full object-cover"
             style={{ filter: 'grayscale(100%) brightness(0.25)' }}
-            alt="Modern architectural building"
+            alt="Gedung UIN Palopo"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6NDfr27MdLT0fMd7c7YjgkaN-IQJydo93XmUHdwxAbYnTJVpQmuUZyoSrYUdOr9cD_0WMALBKBwTxLpVxIun6wx22dpXtVYyOQoos3DeaDDDdau5PakXZJ6Op7pHywT0giH-cTldanJ8C449NM_3a6Ofs2mHEMmY5U7iIbFCEzryOJ2Egn9xF8avNDd-YMMupOS9VQJrWQmNT7l3_j97w0smgj3Gvyglhcgv72rzMyW3hbZHD0C4aj8YgZxImHDwz52Ch-69Zscn6"
           />
         </div>
@@ -85,7 +110,6 @@ export function LoginPage() {
           <div className="w-full lg:w-1/2 max-w-xl text-center lg:text-left">
             <div className="mb-8 flex justify-center lg:justify-start">
               <div className="relative flex items-center justify-center" style={{ width: '7rem', height: '7rem' }}>
-                {/* Radial glow matching logo green */}
                 <div
                   className="absolute inset-0 rounded-full"
                   style={{
@@ -94,7 +118,6 @@ export function LoginPage() {
                     transform: 'scale(1.3)',
                   }}
                 />
-                {/* Subtle ring */}
                 <div
                   className="absolute inset-0 rounded-full"
                   style={{
@@ -126,12 +149,12 @@ export function LoginPage() {
             <div className="mt-10 hidden lg:flex items-center gap-6">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined" style={{ color: dk.accent, fontSize: '1.1rem' }}>security</span>
-                <span className="text-xs font-label uppercase tracking-widest" style={{ color: dk.textSubtle }}>Secure Access</span>
+                <span className="text-xs font-label uppercase tracking-widest" style={{ color: dk.textSubtle }}>Akses Aman</span>
               </div>
               <div className="w-px h-4" style={{ background: dk.divider }} />
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined" style={{ color: dk.accent, fontSize: '1.1rem' }}>analytics</span>
-                <span className="text-xs font-label uppercase tracking-widest" style={{ color: dk.textSubtle }}>Real-time Data</span>
+                <span className="text-xs font-label uppercase tracking-widest" style={{ color: dk.textSubtle }}>Data Real-time</span>
               </div>
             </div>
           </div>
@@ -150,7 +173,7 @@ export function LoginPage() {
               {/* Card header + Tahun Anggaran chip */}
               <div className="mb-8 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-bold mb-1 font-headline" style={{ color: dk.text }}>Sign In</h2>
+                  <h2 className="text-2xl font-bold mb-1 font-headline" style={{ color: dk.text }}>Masuk</h2>
                   <p className="text-sm font-body" style={{ color: dk.textMuted }}>
                     Akses sistem manajemen keuangan institusi.
                   </p>
@@ -178,45 +201,46 @@ export function LoginPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Username/NIP */}
+                {/* NIP */}
                 <div className="space-y-1.5">
                   <label className="block text-xs font-label uppercase tracking-wider" style={{ color: dk.textMuted }}>
-                    Username / NIP
+                    NIP
                   </label>
                   <div className="relative">
                     <span
                       className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 transition-colors pointer-events-none"
-                      style={{ fontSize: '1.1rem', color: dk.textSubtle }}
+                      style={{ fontSize: '1.1rem', color: nipError ? dk.errorText : dk.textSubtle }}
                     >person</span>
                     <input
-                      type="email"
-                      autoComplete="email"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="username"
+                      maxLength={18}
                       required
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="Masukkan NIP anda"
+                      value={nip}
+                      onChange={handleNipChange}
+                      onBlur={handleNipBlur}
+                      placeholder="Masukkan NIP"
                       className="w-full rounded-lg py-3.5 pl-11 pr-4 text-sm font-body outline-none transition-all"
                       style={{
                         background: dk.bgInput,
-                        border: `1px solid ${dk.border}`,
+                        border: `1px solid ${nipError ? dk.borderError : dk.border}`,
                         color: dk.text,
                       }}
-                      onFocus={e => (e.currentTarget.style.borderColor = dk.borderFocus)}
-                      onBlur={e  => (e.currentTarget.style.borderColor = dk.border)}
+                      onFocus={e => (e.currentTarget.style.borderColor = nipError ? dk.borderError : dk.borderFocus)}
+                      onBlurCapture={e => (e.currentTarget.style.borderColor = nipError ? dk.borderError : dk.border)}
                     />
                   </div>
+                  {nipError && (
+                    <p className="text-xs" style={{ color: dk.errorText }}>{nipError}</p>
+                  )}
                 </div>
 
-                {/* Password */}
+                {/* Kata Sandi */}
                 <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-label uppercase tracking-wider" style={{ color: dk.textMuted }}>
-                      Password
-                    </label>
-                    <a href="#" className="text-xs font-label transition-colors hover:opacity-80" style={{ color: dk.accent }}>
-                      Lupa sandi?
-                    </a>
-                  </div>
+                  <label className="block text-xs font-label uppercase tracking-wider" style={{ color: dk.textMuted }}>
+                    Kata Sandi
+                  </label>
                   <div className="relative">
                     <span
                       className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -237,6 +261,7 @@ export function LoginPage() {
                       }}
                       onFocus={e => (e.currentTarget.style.borderColor = dk.borderFocus)}
                       onBlur={e  => (e.currentTarget.style.borderColor = dk.border)}
+                      onKeyDown={e => setCapsLock(e.getModifierState('CapsLock'))}
                     />
                     <button
                       type="button"
@@ -249,19 +274,15 @@ export function LoginPage() {
                       </span>
                     </button>
                   </div>
-                </div>
-
-                {/* Remember Me */}
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="remember"
-                    className="w-4 h-4 rounded cursor-pointer"
-                    style={{ accentColor: dk.accent }}
-                  />
-                  <label htmlFor="remember" className="text-sm font-body cursor-pointer select-none" style={{ color: dk.textMuted }}>
-                    Remember this device
-                  </label>
+                  {capsLock && (
+                    <div
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+                      style={{ background: dk.warnBg, border: `1px solid ${dk.warnBorder}`, color: dk.warnText }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>keyboard_capslock</span>
+                      Caps Lock aktif
+                    </div>
+                  )}
                 </div>
 
                 {/* Error */}
@@ -286,25 +307,28 @@ export function LoginPage() {
                     boxShadow: `0 4px 24px rgba(99,102,241,0.25)`,
                   }}
                 >
-                  <span>{submitting ? 'Memverifikasi...' : 'Masuk ke SIMAK'}</span>
-                  {!submitting && (
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>arrow_forward</span>
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span>Memverifikasi...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Masuk</span>
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>arrow_forward</span>
+                    </>
                   )}
                 </button>
-              </form>
 
-              {/* Language switcher */}
-              <div
-                className="mt-8 pt-6 flex justify-center gap-4"
-                style={{ borderTop: `1px solid ${dk.divider}` }}
-              >
-                <button className="text-xs font-label font-semibold" style={{ color: dk.accent }}>ID</button>
-                <span style={{ color: dk.textSubtle }}>|</span>
-                <button
-                  className="text-xs font-label transition-colors hover:opacity-80"
-                  style={{ color: dk.textMuted }}
-                >EN</button>
-              </div>
+                {/* Lupa kata sandi */}
+                <p className="text-center text-xs" style={{ color: dk.textMuted }}>
+                  Lupa kata sandi?{' '}
+                  <span style={{ color: dk.textMuted }}>Hubungi admin SIMAK</span>
+                </p>
+              </form>
             </div>
           </div>
         </div>
@@ -321,18 +345,6 @@ export function LoginPage() {
               <p className="text-[0.6rem] font-label uppercase tracking-widest font-body" style={{ color: dk.textSubtle }}>
                 Dioperasikan oleh Bagian Keuangan UIN Palopo
               </p>
-            </div>
-            <div className="flex gap-6">
-              {['Institutional Terms', 'Privacy Policy', 'Support'].map(link => (
-                <a
-                  key={link}
-                  href="#"
-                  className="text-[0.65rem] font-label uppercase tracking-widest font-body transition-colors hover:opacity-80"
-                  style={{ color: dk.textMuted }}
-                >
-                  {link}
-                </a>
-              ))}
             </div>
           </div>
         </div>

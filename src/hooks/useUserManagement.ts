@@ -1,6 +1,4 @@
-import { supabase } from '../lib/supabase'
-
-const FN_URL = 'https://bqlrbdzmexmjcumechmt.supabase.co/functions/v1'
+import { supabase, supabaseFunctionsUrl } from '../lib/supabase'
 
 async function getAuthHeader(): Promise<string> {
   const { data } = await supabase.auth.getSession()
@@ -31,7 +29,7 @@ export interface EditUserPayload {
 export function useUserManagement() {
   const callCreateUser = async (payload: CreateUserPayload | EditUserPayload): Promise<string | null> => {
     try {
-      const res = await fetch(`${FN_URL}/create-user`, {
+      const res = await fetch(`${supabaseFunctionsUrl}/create-user`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': await getAuthHeader() },
         body: JSON.stringify(payload),
@@ -48,7 +46,7 @@ export function useUserManagement() {
   const editUser   = (payload: EditUserPayload)   => callCreateUser(payload)
 
   const deleteUser = async (targetUserId: string): Promise<string | null> => {
-    const res = await fetch(`${FN_URL}/delete-user`, {
+    const res = await fetch(`${supabaseFunctionsUrl}/delete-user`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',

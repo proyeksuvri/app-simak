@@ -146,3 +146,97 @@ DRAFT (pending) → SUBMITTED (diajukan) → APPROVED (terverifikasi) / REJECTED
 3. **Error dari Supabase** ditampilkan via state `error` dari hook, bukan throw
 4. **Komponen UI** ada di `src/components/ui/` — gunakan yang sudah ada (`Button`, `Modal`, `Table`, `Badge`, `Card`, `EmptyState`) sebelum buat baru
 5. **Tab Pengaturan** mengikuti pola `UserTab` (komponen inline di `PengaturanPage.tsx`)
+
+
+Buat halaman login menggunakan React (functional component) + Tailwind CSS.
+
+Konteks:
+Aplikasi bernama SIMAK (Sistem Manajemen Keuangan) untuk BLU UIN Palopo.
+
+Kebutuhan utama:
+- Gunakan 100% Bahasa Indonesia
+- Desain minimalis, modern, dan fokus ke form login
+- Layout centered (full screen, dark theme diperbolehkan)
+- Responsive (desktop & mobile)
+
+=== STRUKTUR UI ===
+
+Header:
+- Judul besar: "SIMAK"
+- Subjudul: "Sistem Manajemen Keuangan"
+- Deskripsi kecil: "Platform administrasi keuangan BLU UIN Palopo"
+- Tampilkan juga: "Tahun Anggaran: 2026"
+
+Form login:
+- Field 1:
+  Label: "NIP"
+  Input:
+    - type: text
+    - hanya angka (validasi)
+    - placeholder: "Masukkan NIP"
+    - maxLength: 18
+
+- Field 2:
+  Label: "Kata Sandi"
+  Input:
+    - type: password
+    - ada toggle show/hide password (icon mata)
+
+- Tombol:
+  - Label: "Masuk"
+  - Full width
+  - Disabled saat loading
+
+- Info tambahan:
+  Teks kecil di bawah tombol:
+  "Lupa kata sandi? Hubungi admin SIMAK"
+
+=== VALIDASI ===
+- NIP:
+  - wajib diisi
+  - hanya angka
+  - panjang 18 digit
+- Password:
+  - wajib diisi
+
+- Tampilkan error message:
+  "NIP atau kata sandi tidak valid"
+
+- Validasi realtime (onBlur atau onChange)
+
+=== UX BEHAVIOR ===
+- Saat submit:
+  - tampilkan loading spinner di tombol
+  - disable tombol
+- Jika error:
+  - tampilkan pesan error di bawah form
+- Tambahkan deteksi Caps Lock pada password (opsional)
+
+=== SECURITY AWARE UI ===
+- Jangan tampilkan detail error backend
+- Gunakan pattern controlled component (React state)
+
+=== STYLE (TAILWIND) ===
+- Gunakan Tailwind CSS saja
+- Card login di tengah (max-w-md, mx-auto, rounded-xl, shadow-lg)
+- Padding nyaman (p-6 / p-8)
+- Input:
+  - border, rounded-lg
+  - focus:ring
+- Tombol:
+  - warna utama (biru/ungu gradient diperbolehkan)
+- Background:
+  - dark gradient / subtle pattern
+
+=== OUTPUT ===
+- 1 file React component (default export)
+- Tidak perlu backend
+- Gunakan dummy handler:
+  handleLogin()
+
+=== OPTIONAL (jika bisa) ===
+- Animasi ringan (hover/focus)
+- Transisi smooth
+
+Tujuan:
+UI login production-ready, clean, dan mudah diintegrasikan ke sistem SIMAK.

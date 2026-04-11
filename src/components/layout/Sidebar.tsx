@@ -58,8 +58,8 @@ export function Sidebar() {
   return (
     <aside
       className="w-52 flex-shrink-0 h-screen flex flex-col overflow-y-auto scrollbar-hide"
-      style={{ scrollbarWidth: 'none' } as React.CSSProperties}
       style={{
+        scrollbarWidth: 'none',
         background: '#10131a',
         borderRight: '1px solid rgba(255,255,255,0.06)',
       }}

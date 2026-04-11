@@ -99,7 +99,7 @@ export function LaporanPage() {
           >
             <option value="">Semua Unit</option>
             {workUnits.map(u => (
-              <option key={u.id} value={u.id}>{u.nama}</option>
+              <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
         </div>
@@ -166,62 +166,62 @@ export function LaporanPage() {
       {/* Kartu jenis laporan */}
       <div className="grid grid-cols-3 gap-4">
         {LAPORAN_TYPES.map(laporan => (
-          <Card
-            key={laporan.id}
-            padding="md"
-            className={[
-              'flex flex-col gap-4 cursor-pointer transition-all',
-              selectedType === laporan.id ? 'ring-2 ring-primary' : 'hover:shadow-md',
-            ].join(' ')}
-            onClick={() => doSelect(laporan.id)}
-          >
-            <div className="flex items-start gap-3">
-              <div className={[
-                'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
-                selectedType === laporan.id ? 'bg-emerald-gradient' : 'bg-surface-container-high',
-              ].join(' ')}>
-                <span
-                  className={['material-symbols-outlined text-[1.1rem]', selectedType === laporan.id ? 'text-on-primary' : 'text-primary'].join(' ')}
-                  style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}
+          <div key={laporan.id} onClick={() => doSelect(laporan.id)}>
+            <Card
+              padding="md"
+              className={[
+                'flex flex-col gap-4 cursor-pointer transition-all',
+                selectedType === laporan.id ? 'ring-2 ring-primary' : 'hover:shadow-md',
+              ].join(' ')}
+            >
+              <div className="flex items-start gap-3">
+                <div className={[
+                  'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
+                  selectedType === laporan.id ? 'bg-emerald-gradient' : 'bg-surface-container-high',
+                ].join(' ')}>
+                  <span
+                    className={['material-symbols-outlined text-[1.1rem]', selectedType === laporan.id ? 'text-on-primary' : 'text-primary'].join(' ')}
+                    style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}
+                  >
+                    {laporan.icon}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-on-surface font-headline">{laporan.label}</p>
+                  <p className="text-xs text-on-surface-variant font-body mt-0.5">{laporan.desc}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-auto">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="visibility"
+                  className="flex-1"
+                  onClick={e => { e.stopPropagation(); doSelect(laporan.id) }}
                 >
-                  {laporan.icon}
-                </span>
+                  Lihat
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="picture_as_pdf"
+                  disabled={exporting}
+                  onClick={e => doPdf(e, laporan.id, laporan.label)}
+                >
+                  PDF
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon="table_view"
+                  disabled={exporting}
+                  onClick={e => doExcel(e, laporan.id, laporan.label)}
+                >
+                  Excel
+                </Button>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-on-surface font-headline">{laporan.label}</p>
-                <p className="text-xs text-on-surface-variant font-body mt-0.5">{laporan.desc}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-auto">
-              <Button
-                variant="ghost"
-                size="sm"
-                icon="visibility"
-                className="flex-1"
-                onClick={e => { e.stopPropagation(); doSelect(laporan.id) }}
-              >
-                Lihat
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="picture_as_pdf"
-                disabled={exporting}
-                onClick={e => doPdf(e, laporan.id, laporan.label)}
-              >
-                PDF
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon="table_view"
-                disabled={exporting}
-                onClick={e => doExcel(e, laporan.id, laporan.label)}
-              >
-                Excel
-              </Button>
-            </div>
-          </Card>
+            </Card>
+          </div>
         ))}
       </div>
     </PageContainer>
