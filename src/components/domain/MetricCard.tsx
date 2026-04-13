@@ -15,9 +15,14 @@ export function MetricCard({ data }: MetricCardProps) {
     ? { color: '#f87171', background: 'rgba(248,113,113,0.12)' }
     : { color: 'rgba(232,234,240,0.5)', background: 'rgba(255,255,255,0.06)' }
 
-  // Saldo Kas mendapat warna purple khusus seperti screenshot
-  const isBalance = data.id === 'saldo'
-  const valueColor = isBalance ? '#c4b5fd' : '#e8eaf0'
+  // Warna nilai per kartu
+  const valueColor =
+    data.id === 'saldo'      ? '#c4b5fd' :  // purple  — Saldo Akhir
+    data.id === 'saldo_awal' ? '#67e8f9' :  // toska   — Saldo Awal
+    data.id === 'rekening'   ? '#4ade80' :  // hijau   — Rekening Aktif
+    data.id === 'pending'    ? '#fbbf24' :  // kuning  — Pending
+    data.id === 'approval'   ? '#60a5fa' :  // biru    — Menunggu Posting
+    '#e8eaf0'
 
   return (
     <div
@@ -61,7 +66,13 @@ export function MetricCard({ data }: MetricCardProps) {
           className="text-2xl font-bold font-headline leading-tight tabular-nums"
           style={{ color: valueColor }}
         >
-          {data.format === 'count' ? `${data.value} dok` : formatRupiah(data.value)}
+          {data.format === 'count'
+            ? data.id === 'rekening'
+              ? `${data.value} rek`
+              : data.id === 'pending' || data.id === 'approval'
+              ? `${data.value} trx`
+              : `${data.value} dok`
+            : formatRupiah(data.value)}
         </p>
         {data.subtitle && (
           <p className="text-xs font-body mt-1" style={{ color: 'rgba(232,234,240,0.35)' }}>

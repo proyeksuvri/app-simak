@@ -4,6 +4,24 @@ import type { DbTransaction } from '../types/database'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
 
+/** Data transaksi dianggap segar selama 5 menit — tab switch tidak memicu refetch */
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+type TxPagedCacheKey = {
+  ta: string; type: string; propStatus: string; unitId: string
+  status: string; month: string; account: string; search: string
+  kategori: string; kategoriList: string
+  sortField: string; sortDir: string; page: number; pageSize: number
+}
+
+type TxPagedCache = {
+  key:   TxPagedCacheKey
+  at:    number
+  rows:  Transaction[]
+  total: number
+  stats: PagedStats
+}
+
 export interface PagedStats {
   totalNominal:   number
   countDraft:     number
@@ -60,6 +78,29 @@ export function useTransactionsPaged(params: UseTransactionsPagedParams) {
   // Gunakan ref agar refetch() selalu punya params terbaru
   const paramsRef = useRef(params)
   paramsRef.current = params
+
+  const cacheRef = useRef<TxPagedCache | null>(null)
+
+  /** Buat cache key dari params saat ini — dipakai di load() dan useEffect */
+  const buildKey = useCallback((): TxPagedCacheKey => {
+    const p = paramsRef.current
+    return {
+      ta:          tahunAnggaran,
+      type:        p.type        ?? '',
+      propStatus:  p.propStatus  ?? '',
+      unitId:      p.unitId      ?? '',
+      status:      p.filterStatus     ?? '',
+      month:       p.filterMonth      ?? '',
+      account:     p.filterAccountId  ?? '',
+      search:      p.searchText       ?? '',
+      kategori:    p.kategori         ?? '',
+      kategoriList:(p.kategoriList    ?? []).join(','),
+      sortField:   p.sortField        ?? '',
+      sortDir:     p.sortDir          ?? '',
+      page:        p.page,
+      pageSize:    p.pageSize,
+    }
+  }, [tahunAnggaran])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -169,14 +210,35 @@ export function useTransactionsPaged(params: UseTransactionsPagedParams) {
     }
     setStats({ totalNominal, countDraft, countDiajukan, countVerified, missingAccount })
 
-    setLoading(false)
-  }, [tahunAnggaran]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Simpan ke cache — dipakai useEffect untuk skip refetch saat tab switch
+    cacheRef.current = {
+      key:   buildKey(),
+      at:    Date.now(),
+      rows:  mapped,
+      total: count ?? 0,
+      stats: { totalNominal, countDraft, countDiajukan, countVerified, missingAccount },
+    }
 
-  // Re-fetch saat params relevan berubah
+    setLoading(false)
+  }, [tahunAnggaran, buildKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch saat params relevan berubah; skip jika cache masih segar (< 5 menit)
   useEffect(() => {
+    const key = buildKey()
+    const c   = cacheRef.current
+    const hit = c
+      && (Date.now() - c.at) < CACHE_TTL_MS
+      && (Object.keys(key) as (keyof TxPagedCacheKey)[]).every(k => c.key[k] === key[k])
+    if (hit) {
+      setRows(c.rows)
+      setTotal(c.total)
+      setStats(c.stats)
+      return
+    }
     load()
   }, [
     load,
+    buildKey,
     tahunAnggaran,
     params.type, params.propStatus, params.unitId,
     params.filterStatus, params.filterMonth, params.filterAccountId,

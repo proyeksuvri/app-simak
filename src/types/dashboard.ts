@@ -61,3 +61,21 @@ export interface BpnAlertCounts {
   rejected:       number  // status REJECTED
   missingAccount: number  // status != REJECTED & destination_account_id IS NULL
 }
+
+export interface RekeningAktifRow {
+  id:            string
+  bankName:      string
+  accountNumber: string
+  accountName:   string
+}
+
+export type AnomalySeverity = 'kritis' | 'peringatan' | 'info'
+
+export interface AnomalyItem {
+  id:       string          // unik per jenis anomali
+  severity: AnomalySeverity
+  kategori: string          // "Risiko Keuangan", "Kepatuhan Dokumen", dll.
+  title:    string
+  detail:   string
+  count:    number
+}

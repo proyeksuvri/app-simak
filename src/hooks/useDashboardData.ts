@@ -1,17 +1,28 @@
-import { useState, useEffect } from 'react'
-import type { MetricCardData, ChartDataPoint, ApprovalItem, BpnPipelineData, BpnKategoriRow, BpnRekeningRow, BpnActionItem, BpnAlertCounts } from '../types'
-import type { DbTransaction, DbPeriod } from '../types/database'
+import { useState, useEffect, useRef } from 'react'
+import type { MetricCardData, ChartDataPoint, ApprovalItem, BpnPipelineData, BpnKategoriRow, BpnRekeningRow, BpnActionItem, BpnAlertCounts, RekeningAktifRow } from '../types'
+import type { DbTransaction, DbPeriod, DbAccount } from '../types/database'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from '../context/AppContext'
 
 const EMPTY_METRICS: MetricCardData[] = [
-  { id: 'm1', label: 'Total Penerimaan',   value: 0, icon: 'trending_up',           trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
-  { id: 'm2', label: 'Total Pengeluaran',  value: 0, icon: 'trending_down',          trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
-  { id: 'm3', label: 'Saldo Kas',          value: 0, icon: 'account_balance_wallet', trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
-  { id: 'm4', label: 'Transaksi Verified', value: 0, icon: 'verified',               trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'saldo_awal', label: 'Saldo Awal',         value: 0, icon: 'account_balance',        trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'm1',         label: 'Total Penerimaan',   value: 0, icon: 'trending_up',            trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'm2',         label: 'Total Pengeluaran',  value: 0, icon: 'trending_down',           trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'saldo',      label: 'Saldo Akhir',        value: 0, icon: 'account_balance_wallet',  trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'm4',         label: 'Transaksi Verified', value: 0, icon: 'verified',                trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'rekening',   label: 'Rekening Aktif',     value: 0, icon: 'credit_card',             trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'pending',    label: 'Transaksi Pending',  value: 0, icon: 'pending_actions',         trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
+  { id: 'approval',   label: 'Menunggu Posting',   value: 0, icon: 'approval',                trendDir: 'neutral', trend: 0, subtitle: 'Memuat...' },
 ]
 
-export function useDashboardData(filterFrom: string, filterTo: string, periodLabel: string) {
+export type ChartView = 'harian' | 'mingguan' | 'bulanan'
+
+/** Data dianggap segar selama 5 menit — tab switch tidak memicu refetch */
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+type CacheKey = { filterFrom: string; filterTo: string; chartView: ChartView; userId: string; role: string }
+
+export function useDashboardData(filterFrom: string, filterTo: string, periodLabel: string, chartView: ChartView = 'harian') {
   const { currentUser } = useAppContext()
   const [metrics,          setMetrics]   = useState<MetricCardData[]>(EMPTY_METRICS)
   const [chartData,        setChartData] = useState<ChartDataPoint[]>([])
@@ -23,16 +34,26 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
   const [bpnRekening,    setBpnRekening]    = useState<BpnRekeningRow[]>([])
   const [bpnActionItems, setBpnActionItems] = useState<BpnActionItem[]>([])
   const [bpnAlerts,      setBpnAlerts]      = useState<BpnAlertCounts>({ rejected: 0, missingAccount: 0 })
+  const [rekeningAktif,  setRekeningAktif]  = useState<RekeningAktifRow[]>([])
+
+  const cacheRef = useRef<{ key: CacheKey; at: number } | null>(null)
 
   const role   = currentUser.role
   const unitId = currentUser.unitId
-  const isGlobal = role === 'admin' || role === 'pimpinan'
-  const isBPN    = role === 'bendahara_penerimaan'
-  const isBPK    = role === 'bendahara_induk' || role === 'bendahara_pembantu'
+  const profileReady = !!currentUser.id
+  const isGlobal = profileReady && (role === 'admin' || role === 'pimpinan')
+  const isBPN    = profileReady && role === 'bendahara_penerimaan'
+  const isBPK    = profileReady && (role === 'bendahara_induk' || role === 'bendahara_pembantu')
 
   useEffect(() => {
     // Tunggu sampai user profile siap (bukan loading placeholder)
     if (!currentUser.id) return
+
+    // Skip refetch jika parameter sama dan data masih segar (tab switch, dll.)
+    const cacheKey: CacheKey = { filterFrom, filterTo, chartView, userId: currentUser.id, role: currentUser.role }
+    const cache = cacheRef.current
+    const paramsMatch = cache && Object.keys(cacheKey).every(k => cache.key[k as keyof CacheKey] === cacheKey[k as keyof CacheKey])
+    if (paramsMatch && (Date.now() - cache!.at) < CACHE_TTL_MS) return
 
     let cancelled = false
 
@@ -107,7 +128,34 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
         .limit(1)
         .single()
 
-      // ── 5. BPN full data — semua status, untuk pipeline & breakdown ────────
+      // ── 5. Rekening Aktif ─────────────────────────────────────────────────────
+      const rekeningQuery = supabase
+        .from('vw_rekening_aktif')
+        .select('id, bank_name, account_number, account_name')
+
+      // ── 7. Status Count — SUBMITTED (pending) dan APPROVED (menunggu posting) ─
+      let statusCountQuery = supabase
+        .from('vw_transaksi_status')
+        .select('status, jumlah')
+        .in('status', ['SUBMITTED', 'APPROVED'])
+        .gte('tanggal', filterFrom)
+        .lte('tanggal', filterTo)
+
+      if (isBPN) statusCountQuery = statusCountQuery.eq('type', 'IN')
+      if (isBPK) statusCountQuery = statusCountQuery.eq('type', 'OUT')
+
+      // ── 8. Saldo Awal — kumulatif semua transaksi sebelum filterFrom ─────────
+      const saldoAwalQuery = (!isBPN && !isBPK)
+        ? supabase
+            .from('vw_saldo_kumulatif')
+            .select('saldo_akhir')
+            .lt('tanggal', filterFrom)
+            .order('tanggal', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null })
+
+      // ── 9. BPN full data — semua status, untuk pipeline & breakdown ────────
       const bpnFullQuery = isBPN
         ? supabase
             .from('transactions')
@@ -118,8 +166,8 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
             .lte('transaction_date', filterTo)
         : Promise.resolve({ data: null })
 
-      const [aggResult, kpiViewResult, chartResult, pendingResult, periodResult, bpnResult] = await Promise.all([
-        aggQuery, kpiViewQuery, chartQuery, pendingQuery, periodQuery, bpnFullQuery,
+      const [aggResult, kpiViewResult, chartResult, pendingResult, periodResult, rekeningResult, statusCountResult, saldoAwalResult, bpnResult] = await Promise.all([
+        aggQuery, kpiViewQuery, chartQuery, pendingQuery, periodQuery, rekeningQuery, statusCountQuery, saldoAwalQuery, bpnFullQuery,
       ])
 
       if (cancelled) return
@@ -176,18 +224,28 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
         const totalKeluarView = hasViewData
           ? kpiRows.reduce((s, r) => s + Number(r.total_pengeluaran ?? 0), 0)
           : totalKeluar
-        const saldoKasView = hasViewData
-          ? kpiRows.reduce((s, r) => s + Number(r.saldo_kas ?? 0), 0)
-          : saldoKas
         const verifiedView = hasViewData
           ? kpiRows.reduce((s, r) => s + Number(r.transaksi_verified ?? 0), 0)
           : agg.length
 
+        // Hitung saldo awal dari vw_saldo_kumulatif
+        const saldoAwal = Number((saldoAwalResult.data as { saldo_akhir: number } | null)?.saldo_akhir ?? 0)
+        const saldoAkhir = saldoAwal + totalMasukView - totalKeluarView
+
+        const jumlahRekeningAktif = (rekeningResult.data ?? []).length
+        const statusRows = (statusCountResult.data ?? []) as { status: string; jumlah: number }[]
+        const countPending  = statusRows.filter(r => r.status === 'SUBMITTED').reduce((s, r) => s + r.jumlah, 0)
+        const countApproval = statusRows.filter(r => r.status === 'APPROVED').reduce((s, r) => s + r.jumlah, 0)
+
         setMetrics([
-          { id: 'm1', label: 'Total Penerimaan',   value: totalMasukView,   icon: 'trending_up',             trendDir: 'up',      trend: 0, subtitle: periodLabel },
-          { id: 'm2', label: 'Total Pengeluaran',  value: totalKeluarView,  icon: 'trending_down',            trendDir: 'down',    trend: 0, subtitle: periodLabel },
-          { id: 'm3', label: 'Saldo Kas',          value: saldoKasView,     icon: 'account_balance_wallet',   trendDir: 'neutral', trend: 0, subtitle: 'Kas bersih' },
-          { id: 'm4', label: 'Transaksi Verified', value: verifiedView,     icon: 'verified',                 trendDir: 'neutral', trend: 0, subtitle: 'Transaksi terposting' },
+          { id: 'saldo_awal', label: 'Saldo Awal',         value: saldoAwal,            icon: 'account_balance',         trendDir: 'neutral', trend: 0, subtitle: `Per awal ${periodLabel}` },
+          { id: 'm1',         label: 'Total Penerimaan',   value: totalMasukView,       icon: 'trending_up',             trendDir: 'up',      trend: 0, subtitle: periodLabel },
+          { id: 'm2',         label: 'Total Pengeluaran',  value: totalKeluarView,      icon: 'trending_down',           trendDir: 'down',    trend: 0, subtitle: periodLabel },
+          { id: 'saldo',      label: 'Saldo Akhir',        value: saldoAkhir,           icon: 'account_balance_wallet',  trendDir: 'neutral', trend: 0, subtitle: `Per akhir ${periodLabel}` },
+          { id: 'm4',         label: 'Transaksi Verified', value: verifiedView,         icon: 'verified',                trendDir: 'neutral', trend: 0, subtitle: 'Transaksi terposting', format: 'count' },
+          { id: 'rekening',   label: 'Rekening Aktif',     value: jumlahRekeningAktif,  icon: 'credit_card',             trendDir: 'neutral', trend: 0, subtitle: 'Rekening terdaftar',  format: 'count' },
+          { id: 'pending',    label: 'Transaksi Pending',  value: countPending,         icon: 'pending_actions',         trendDir: 'neutral', trend: 0, subtitle: 'Menunggu persetujuan', format: 'count' },
+          { id: 'approval',   label: 'Menunggu Posting',   value: countApproval,        icon: 'approval',                trendDir: 'neutral', trend: 0, subtitle: 'Sudah disetujui',      format: 'count' },
         ])
       }
 
@@ -195,7 +253,12 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
       const chartRows = (chartResult.data ?? []) as Pick<DbTransaction, 'type' | 'amount' | 'transaction_date'>[]
       const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
-      if (useMonthly) {
+      // Tentukan granularitas: chartView param, fallback ke auto
+      const effectiveView: ChartView = chartView === 'bulanan' ? 'bulanan'
+        : chartView === 'mingguan' ? 'mingguan'
+        : useMonthly ? 'bulanan' : 'harian'
+
+      if (effectiveView === 'bulanan') {
         // Agregasi bulanan
         const byMonth: Record<string, { penerimaan: number; pengeluaran: number }> = {}
         const [sy, sm] = filterFrom.split('-').map(Number) as [number, number]
@@ -218,6 +281,41 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([, v]) => ({
               label:       (v as any).__label as string,
+              penerimaan:  v.penerimaan,
+              pengeluaran: v.pengeluaran,
+            }))
+        )
+      } else if (effectiveView === 'mingguan') {
+        // Agregasi mingguan — bucket per ISO week (Senin s/d Minggu)
+        const getMonday = (dateStr: string) => {
+          const d = new Date(dateStr)
+          const day = d.getUTCDay() // 0=Sun
+          const diff = day === 0 ? -6 : 1 - day
+          d.setUTCDate(d.getUTCDate() + diff)
+          return d.toISOString().split('T')[0]!
+        }
+        const byWeek: Record<string, { penerimaan: number; pengeluaran: number; label: string }> = {}
+        // Iterasi semua Senin dalam rentang
+        const startMonday = getMonday(filterFrom)
+        const cur = new Date(startMonday)
+        while (cur.toISOString().split('T')[0]! <= filterTo) {
+          const isoKey = cur.toISOString().split('T')[0]!
+          const dd  = String(cur.getUTCDate()).padStart(2, '0')
+          const mon = MONTHS_SHORT[cur.getUTCMonth()]!
+          byWeek[isoKey] = { penerimaan: 0, pengeluaran: 0, label: `${dd} ${mon}` }
+          cur.setUTCDate(cur.getUTCDate() + 7)
+        }
+        for (const r of chartRows) {
+          const key = getMonday(r.transaction_date.split('T')[0]!)
+          if (!byWeek[key]) continue
+          if (r.type === 'IN')  byWeek[key]!.penerimaan  += Number(r.amount)
+          if (r.type === 'OUT') byWeek[key]!.pengeluaran += Number(r.amount)
+        }
+        setChartData(
+          Object.entries(byWeek)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([, v]) => ({
+              label:       v.label,
               penerimaan:  v.penerimaan,
               pengeluaran: v.pengeluaran,
             }))
@@ -285,6 +383,17 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
       if (period) {
         const lastDay = new Date(period.year, period.month, 0)
         setDeadline(lastDay.toISOString().split('T')[0]!)
+      }
+
+      // ── Proses rekening aktif ─────────────────────────────────────────────
+      if (!cancelled) {
+        const rekRows = (rekeningResult.data ?? []) as Pick<DbAccount, 'id' | 'bank_name' | 'account_number' | 'account_name'>[]
+        setRekeningAktif(rekRows.map(r => ({
+          id:            r.id,
+          bankName:      r.bank_name,
+          accountNumber: r.account_number,
+          accountName:   r.account_name,
+        })))
       }
 
       // ── Proses BPN: pipeline, alerts, kategori, action items ──────────────
@@ -395,9 +504,10 @@ export function useDashboardData(filterFrom: string, filterTo: string, periodLab
       }
     }
 
-    load().finally(() => { if (!cancelled) setLoading(false) })
+    load().then(() => { if (!cancelled) cacheRef.current = { key: cacheKey, at: Date.now() } })
+          .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [filterFrom, filterTo, currentUser.id, currentUser.role, currentUser.unitId])
+  }, [filterFrom, filterTo, chartView, currentUser.id, currentUser.role, currentUser.unitId])
 
-  return { metrics, chartData, approvals, deadlineTutupBuku, loading, isBPN, isBPK, isGlobal, bpnPipeline, bpnKategori, bpnRekening, bpnActionItems, bpnAlerts }
+  return { metrics, chartData, approvals, deadlineTutupBuku, loading, isBPN, isBPK, isGlobal, bpnPipeline, bpnKategori, bpnRekening, bpnActionItems, bpnAlerts, rekeningAktif }
 }

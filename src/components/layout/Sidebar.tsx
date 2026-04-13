@@ -96,7 +96,10 @@ export function Sidebar() {
               <SidebarNavItem to="/penerimaan/bpn"        icon="receipt_long"  label="Penerimaan (BPN)" />
             )}
             {(isBendaharaPenerimaan || isAdmin) && (
-              <SidebarNavItem to="/penerimaan/bpn-keluar" icon="money_off"     label="Pengeluaran BPN" />
+              <SidebarNavItem to="/penerimaan/bpn-keluar"    icon="money_off"  label="Pengeluaran BPN" />
+            )}
+            {(isBendaharaPenerimaan || isAdmin) && (
+              <SidebarNavItem to="/penerimaan/mutasi-parser" icon="transform"  label="Parser Mutasi" />
             )}
             {(isBendaharaInduk || isBendaharaPembantu || isAdmin) && (
               <SidebarNavItem to="/pengeluaran/bpk"    icon="payments"      label="Pengeluaran (BPK)" />
