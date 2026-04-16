@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { Modal } from '../../components/ui/Modal'
@@ -41,6 +41,67 @@ export function PengaturanPage() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null)
+
+  // Avatar CRUD
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError]         = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview]     = useState<string | null>(currentUser.avatar_url)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!avatarInputRef.current) avatarInputRef.current = e.target
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError('Ukuran file maksimal 2 MB.')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Hanya file gambar yang diizinkan.')
+      return
+    }
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      const ext  = file.name.split('.').pop() ?? 'jpg'
+      const path = `${currentUser.id}/avatar.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+      const cacheBusted = `${publicUrl}?t=${Date.now()}`
+      await supabase.auth.updateUser({ data: { avatar_url: cacheBusted } })
+      setAvatarPreview(cacheBusted)
+      setProfileSuccess('Foto profil berhasil diperbarui.')
+    } catch (err: unknown) {
+      setAvatarError(err instanceof Error ? err.message : 'Gagal mengunggah foto.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  const handleAvatarDelete = async () => {
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      // Try to remove all common extensions
+      const exts = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+      await Promise.allSettled(
+        exts.map(ext =>
+          supabase.storage.from('avatars').remove([`${currentUser.id}/avatar.${ext}`])
+        )
+      )
+      await supabase.auth.updateUser({ data: { avatar_url: null } })
+      setAvatarPreview(null)
+      setProfileSuccess('Foto profil berhasil dihapus.')
+    } catch (err: unknown) {
+      setAvatarError(err instanceof Error ? err.message : 'Gagal menghapus foto.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   const usersState = useUsers()
   const periodsState = useManagePeriods()
@@ -167,16 +228,81 @@ export function PengaturanPage() {
               <h3 className="text-sm font-semibold text-white font-headline tracking-wide uppercase">Profil Pengguna</h3>
             </div>
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg,#009B72,#006650)' }}>
-                <span className="text-xl font-bold text-white font-headline">
-                  {currentUser.nama.charAt(0)}
-                </span>
+              {/* Avatar with CRUD overlay */}
+              <div className="relative flex-shrink-0 group">
+                {/* Hidden file input */}
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+
+                {/* Avatar circle */}
+                <div
+                  className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg,#009B72,#006650)' }}
+                >
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl font-bold text-white font-headline select-none">
+                      {currentUser.nama.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                {/* Upload overlay on hover */}
+                <button
+                  type="button"
+                  disabled={avatarUploading}
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: 'rgba(0,0,0,0.55)' }}
+                  title="Ganti foto"
+                >
+                  {avatarUploading ? (
+                    <span className="material-symbols-outlined text-white animate-spin" style={{ fontSize: '1.1rem' }}>
+                      progress_activity
+                    </span>
+                  ) : (
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '1.1rem' }}>
+                      photo_camera
+                    </span>
+                  )}
+                </button>
+
+                {/* Delete badge — top-right corner */}
+                {avatarPreview && !avatarUploading && (
+                  <button
+                    type="button"
+                    onClick={handleAvatarDelete}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: '#ef4444', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
+                    title="Hapus foto"
+                  >
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: '0.65rem', fontVariationSettings: "'FILL' 1" }}>
+                      close
+                    </span>
+                  </button>
+                )}
               </div>
+
               <div>
                 <p className="font-semibold text-white font-body">{currentUser.nama}</p>
                 <p className="text-xs text-white/50 font-body">{USER_ROLE_LABELS[currentUser.role]}</p>
                 <p className="text-xs text-white/40 font-body mt-0.5">{currentUser.email}</p>
+                {avatarError && (
+                  <p className="text-xs text-red-400 font-body mt-1">{avatarError}</p>
+                )}
+                <p className="text-[10px] text-white/25 font-body mt-1">
+                  Hover foto untuk ganti · maks. 2 MB
+                </p>
               </div>
             </div>
             <div className="space-y-1">

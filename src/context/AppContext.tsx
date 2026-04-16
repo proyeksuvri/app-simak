@@ -16,12 +16,13 @@ function readStoredYear(): number {
 
 // Placeholder sementara selama profile diambil di background
 const LOADING_USER: User = {
-  id:    '',
-  nama:  '...',
-  role:  'bendahara_penerimaan',
-  unitId: null,
-  email: '',
-  nip:   '',
+  id:         '',
+  nama:       '...',
+  role:       'bendahara_penerimaan',
+  unitId:     null,
+  email:      '',
+  nip:        '',
+  avatar_url: null,
 }
 
 interface AppContextValue {

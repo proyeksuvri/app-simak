@@ -14,10 +14,11 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export interface User {
-  id:        string
-  nama:      string
-  role:      UserRole
-  unitId:    string | null  // null untuk admin, pimpinan, BIP, BP
-  email:     string
-  nip:       string
+  id:         string
+  nama:       string
+  role:       UserRole
+  unitId:     string | null  // null untuk admin, pimpinan, BIP, BP
+  email:      string
+  nip:        string
+  avatar_url: string | null
 }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
 import { USER_ROLE_LABELS } from '../../types'
 import { SidebarNavItem } from './SidebarNavItem'
+import logoUinPalopo from '../../assets/logo-uinpalopo.png'
 
 function SidebarGroup({
   label,
@@ -22,7 +23,7 @@ function SidebarGroup({
         className="w-full flex items-center justify-between px-3 mb-1 group"
       >
         <p
-          className="text-[0.58rem] font-semibold uppercase tracking-widest font-body transition-colors"
+          className="text-[10px] font-semibold uppercase tracking-widest font-body transition-colors"
           style={{ color: open ? 'rgba(232,234,240,0.5)' : 'rgba(232,234,240,0.3)' }}
         >
           {label}
@@ -66,18 +67,15 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="px-5 py-5 flex items-center gap-3 flex-shrink-0">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg, #6C48D1, #9B6DFF)' }}
-        >
-          <span
-            className="material-symbols-outlined text-white"
-            style={{ fontSize: '1rem', fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20" }}
-          >account_balance</span>
-        </div>
+        <img
+          src={logoUinPalopo}
+          alt="Logo UIN Palopo"
+          className="w-8 h-8 rounded-lg object-contain flex-shrink-0"
+          style={{ background: '#fff' }}
+        />
         <div>
-          <p className="text-sm font-bold font-headline leading-tight" style={{ color: '#e8eaf0' }}>SIMAK UIN</p>
-          <p className="text-[0.6rem] font-body leading-tight" style={{ color: 'rgba(232,234,240,0.4)' }}>Palopo Finance</p>
+          <p className="text-sm font-bold font-headline leading-tight" style={{ color: '#e8eaf0' }}>SIMAK</p>
+          <p className="text-[10px] font-body leading-tight" style={{ color: 'rgba(232,234,240,0.4)' }}>UIN Palopo</p>
         </div>
       </div>
 
@@ -182,10 +180,13 @@ export function Sidebar() {
           style={{ background: 'rgba(255,255,255,0.04)' }}
         >
           <div
-            className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
+            className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white overflow-hidden"
             style={{ background: 'linear-gradient(135deg, #6C48D1, #9B6DFF)' }}
           >
-            {currentUser.nama.charAt(0)}
+            {currentUser.avatar_url
+              ? <img src={currentUser.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+              : currentUser.nama.charAt(0)
+            }
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold font-body truncate" style={{ color: '#e8eaf0' }}>

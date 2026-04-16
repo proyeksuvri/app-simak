@@ -27,6 +27,7 @@ import * as XLSX from 'xlsx'
 import { PageContainer }        from '../../components/layout/PageContainer'
 import { Card }                 from '../../components/ui/Card'
 import { Button }               from '../../components/ui/Button'
+import { ParseRulesPanel }      from '../../components/domain/ParseRulesPanel'
 import { useBankAccounts }      from '../../hooks/useBankAccounts'
 import { useRevenueCategories } from '../../hooks/useRevenueCategories'
 import { formatRupiah }         from '../../lib/formatters'
@@ -604,6 +605,9 @@ export function MutasiBankParserPage() {
       title="Parser Mutasi Bank"
       subtitle="Konversi file mutasi BRI (Internet Banking / CMS NLedger) ke template upload massal"
     >
+
+      {/* ── Referensi Aturan Parsing — selalu tampil ─────────────────────────── */}
+      <ParseRulesPanel rows={rows} txType={txType} />
 
       {/* ── Upload Area ──────────────────────────────────────────────────────── */}
       {!hasRows && (

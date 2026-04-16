@@ -44,6 +44,9 @@ async function fetchProfile(userId: string): Promise<User | null> {
         const roleName = String(body.role_name ?? '')
         const categoryName = body.treasurer_category ? String(body.treasurer_category) : null
         const email = String(body.email ?? '')
+        // Read avatar_url from user_metadata as fallback
+        const { data: authUser } = await supabase.auth.getUser()
+        const meta = authUser?.user?.user_metadata as Record<string, unknown> | undefined
         return {
           id: userId,
           nama: String(body.nama || email.split('@')[0] || 'Pengguna'),
@@ -51,6 +54,7 @@ async function fetchProfile(userId: string): Promise<User | null> {
           role: mapToAppRole(roleName, categoryName),
           unitId: body.work_unit_id ? String(body.work_unit_id) : null,
           nip: String(body.nip || deriveNipFromEmail(email)),
+          avatar_url: (meta?.avatar_url as string) || null,
         }
       }
     } catch {
@@ -106,13 +110,15 @@ async function fetchProfile(userId: string): Promise<User | null> {
     }
   }
 
+  const meta2 = authUser?.user?.user_metadata as Record<string, unknown> | undefined
   return {
-    id:     userId,
-    nama:   email.split('@')[0] ?? 'Pengguna',
+    id:         userId,
+    nama:       email.split('@')[0] ?? 'Pengguna',
     email,
-    role:   mapToAppRole(roleName, categoryName),
-    unitId: null,
-    nip:    deriveNipFromEmail(email),
+    role:       mapToAppRole(roleName, categoryName),
+    unitId:     null,
+    nip:        deriveNipFromEmail(email),
+    avatar_url: (meta2?.avatar_url as string) || null,
   }
 }
 

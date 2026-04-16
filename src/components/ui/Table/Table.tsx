@@ -28,7 +28,7 @@ export function TableHeadCell({
   const alignClass = align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
   return (
     <th
-      className={['px-4 py-3 text-[0.65rem] font-semibold uppercase tracking-widest font-body', alignClass].join(' ')}
+      className={['px-4 py-3 text-[10px] font-semibold uppercase tracking-widest font-body', alignClass].join(' ')}
       style={{ color: 'rgba(255,255,255,0.95)' }}
     >
       {children}

@@ -66,12 +66,12 @@ export function PendingApprovals({ items, loading }: PendingApprovalsProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <PriorityBadge priority={item.priority} />
-                <span className="text-[0.6rem] font-body" style={{ color: 'rgba(232,234,240,0.35)' }}>
+                <span className="text-[10px] font-body" style={{ color: 'rgba(232,234,240,0.35)' }}>
                   {formatTanggal(item.dueDate)}
                 </span>
               </div>
               <p className="text-xs font-semibold font-body truncate" style={{ color: '#e8eaf0' }}>{item.title}</p>
-              <p className="text-[0.65rem] font-body mt-0.5 truncate" style={{ color: 'rgba(232,234,240,0.4)' }}>
+              <p className="text-[10px] font-body mt-0.5 truncate" style={{ color: 'rgba(232,234,240,0.4)' }}>
                 {item.requestBy}
               </p>
             </div>

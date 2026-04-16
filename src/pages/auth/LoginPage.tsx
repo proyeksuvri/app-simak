@@ -130,8 +130,7 @@ export function LoginPage() {
                   alt="Lambang UIN Palopo"
                   src={logoUinPalopo}
                   style={{
-                    mixBlendMode: 'multiply',
-                    filter: 'drop-shadow(0 0 12px rgba(21,128,61,0.6))',
+                    filter: 'drop-shadow(0 0 12px rgba(21,128,61,0.5))',
                   }}
                 />
               </div>

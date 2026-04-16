@@ -7,6 +7,7 @@ export const mockUsers: User[] = [
     role:   'admin',
     unitId: null,
     email:  'admin@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '197801012005011001',
   },
   {
@@ -15,6 +16,7 @@ export const mockUsers: User[] = [
     role:   'pimpinan',
     unitId: null,
     email:  'rektor@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '196505051993031002',
   },
   {
@@ -23,6 +25,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_induk',
     unitId: null,
     email:  'bip@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '197203151999031003',
   },
   {
@@ -31,6 +34,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_penerimaan',
     unitId: null,
     email:  'bp@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '198506102010011004',
   },
   {
@@ -39,6 +43,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_pembantu',
     unitId: 'unit-01',
     email:  'bpp.ft@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '198812022012012005',
   },
   {
@@ -47,6 +52,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_pembantu',
     unitId: 'unit-02',
     email:  'bpp.fe@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '199001152014011006',
   },
   {
@@ -55,6 +61,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_pembantu',
     unitId: 'unit-03',
     email:  'bpp.fush@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '199103202015012007',
   },
   {
@@ -63,6 +70,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_pembantu',
     unitId: 'unit-04',
     email:  'bpp.ftk@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '198907112014011008',
   },
   {
@@ -71,6 +79,7 @@ export const mockUsers: User[] = [
     role:   'bendahara_pembantu',
     unitId: 'unit-05',
     email:  'bpp.fk@uinpalopo.ac.id',
+    avatar_url: null,
     nip:    '199205252016012009',
   },
 ]

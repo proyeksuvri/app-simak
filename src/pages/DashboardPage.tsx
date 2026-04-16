@@ -3,14 +3,14 @@ import { MetricCard } from '../components/domain/MetricCard'
 import { CashFlowChart } from '../components/domain/CashFlowChart'
 import { PendingApprovals } from '../components/domain/PendingApprovals'
 import { TransactionTable } from '../components/domain/TransactionTable'
-import { AnomalyRisikoPanel } from '../components/domain/AnomalyRisikoPanel'
 import { BreakdownStrategisPanel } from '../components/domain/BreakdownStrategisPanel'
+import { SaldoPerBankPanel } from '../components/domain/SaldoPerBankPanel'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Table, TableHead, TableHeadCell, TableBody, TableRow, TableCell } from '../components/ui/Table/Table'
 import { useDashboardData } from '../hooks/useDashboardData'
-import { useAnomalyData } from '../hooks/useAnomalyData'
 import { useRevenueBreakdown } from '../hooks/useRevenueBreakdown'
+import { useSaldoPerBank } from '../hooks/useSaldoPerBank'
 import { useExportDashboardPDF } from '../hooks/useExportDashboardPDF'
 import type { ChartView } from '../hooks/useDashboardData'
 import { useAppContext } from '../context/AppContext'
@@ -79,14 +79,14 @@ export function DashboardPage() {
   const unitId     = currentUser.unitId
   const canApprove = role === 'pimpinan' || role === 'admin'
 
-  // Anomali & Risiko — hanya untuk pimpinan dan admin
-  const { anomalies, loading: anomalyLoading } = useAnomalyData(
+  // Breakdown Strategis — hanya untuk pimpinan dan admin
+  const { rows: revenueBreakdownRows, loading: revenueBreakdownLoading } = useRevenueBreakdown(
     canApprove ? filterFrom : '',
     canApprove ? filterTo   : '',
   )
 
-  // Breakdown Strategis — hanya untuk pimpinan dan admin
-  const { rows: revenueBreakdownRows, loading: revenueBreakdownLoading } = useRevenueBreakdown(
+  // Saldo Akhir per Bank — hanya untuk pimpinan dan admin
+  const { rows: saldoPerBankRows, loading: saldoPerBankLoading } = useSaldoPerBank(
     canApprove ? filterFrom : '',
     canApprove ? filterTo   : '',
   )
@@ -112,24 +112,80 @@ export function DashboardPage() {
     return filterMode === 'bulan' ? 4 : 0
   }, [chartView, filterMode])
 
+  const greeting = (() => {
+    const h = now.getHours()
+    if (h < 11)  return 'Selamat Pagi'
+    if (h < 15)  return 'Selamat Siang'
+    if (h < 18)  return 'Selamat Sore'
+    return 'Selamat Malam'
+  })()
+
+  const roleLabelMap: Record<string, string> = {
+    admin:               'Administrator',
+    pimpinan:            'Pimpinan',
+    bendahara_pembantu:  'Bendahara Pembantu',
+    bpn:                 'Bendahara Penerimaan',
+    bpk:                 'Bendahara Pengeluaran',
+  }
+  const roleLabel = roleLabelMap[role] ?? role
+
+  const todayLabel = now.toLocaleDateString('id-ID', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+
   return (
     <div className="px-6 pb-8 pt-5" style={{ color: '#e8eaf0' }}>
 
-      {/* BPN Alert Strip */}
-      {isBPN && bpnAlerts && (bpnAlerts.rejected > 0 || bpnAlerts.missingAccount > 0) && (
-        <BpnAlertStrip alerts={bpnAlerts} />
-      )}
-
-      {/* Executive Summary header */}
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <h2 className="text-2xl font-bold font-headline" style={{ color: '#e8eaf0' }}>
-            Executive Summary
-          </h2>
-          <p className="text-xs font-body mt-1" style={{ color: 'rgba(232,234,240,0.45)' }}>
-            Real-time financial status of UIN Palopo for the current fiscal period.
-          </p>
+      {/* Welcome Header */}
+      <div
+        className="flex items-center justify-between rounded-2xl px-6 py-5 mb-5"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        {/* Left — avatar + greeting + title */}
+        <div className="flex items-center gap-4">
+          <div
+            className="flex items-center justify-center rounded-xl text-sm font-bold font-headline shrink-0 overflow-hidden"
+            style={{
+              width: 46, height: 46,
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              color: '#fff',
+              boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
+            }}
+          >
+            {currentUser.avatar_url ? (
+              <img src={currentUser.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              (currentUser.nama || currentUser.email || '?').slice(0, 2).toUpperCase()
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-body mb-0.5" style={{ color: 'rgba(232,234,240,0.5)' }}>
+              {greeting},{' '}
+              <span style={{ color: 'rgba(232,234,240,0.8)' }}>
+                {currentUser.nama || currentUser.email}
+              </span>
+              {' '}&mdash;{' '}
+              <span
+                className="inline-block px-1.5 py-0.5 rounded text-xs"
+                style={{ background: 'rgba(99,102,241,0.18)', color: '#a5b4fc' }}
+              >
+                {roleLabel}
+              </span>
+            </p>
+            <h1 className="text-xl font-bold font-headline leading-tight" style={{ color: '#e8eaf0' }}>
+              Dashboard Keuangan
+              <span className="ml-2 text-base font-medium" style={{ color: 'rgba(232,234,240,0.45)' }}>
+                SIMAK UIN Palopo
+              </span>
+            </h1>
+          </div>
         </div>
+
+        {/* Right — filter & export */}
         <div className="flex items-center gap-2">
           <PeriodFilter
             mode={filterMode}
@@ -148,7 +204,7 @@ export function DashboardPage() {
               onClick={() => exportPDF({
                 metrics,
                 revenueBreakdown: revenueBreakdownRows,
-                anomalies,
+                anomalies: [],
                 periodLabel,
                 filterFrom,
                 filterTo,
@@ -169,6 +225,11 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* BPN Alert Strip */}
+      {isBPN && bpnAlerts && (bpnAlerts.rejected > 0 || bpnAlerts.missingAccount > 0) && (
+        <BpnAlertStrip alerts={bpnAlerts} />
+      )}
 
       {/* Metric Cards */}
       <div className={`grid gap-4 mb-5 grid-cols-4`}>
@@ -209,16 +270,6 @@ export function DashboardPage() {
               <ChartViewTabs value={chartView} onChange={setChartView} />
             </div>
           </div>
-          {/* Insight Cepat */}
-          {!loading && chartData.length > 0 && (
-            <ChartInsightBox
-              data={chartData}
-              showPenerimaan={!isBPK}
-              showPengeluaran={!isBPN}
-              chartView={chartView}
-              periodLabel={periodLabel}
-            />
-          )}
           {/* Summary strip */}
           {!loading && chartData.length > 0 && (
             <ChartSummaryStrip data={chartData} showPenerimaan={!isBPK} showPengeluaran={!isBPN} />
@@ -263,11 +314,16 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* Anomali & Risiko + Breakdown Strategis — pimpinan & admin (50/50) */}
+      {/* Breakdown Penerimaan + Saldo per Bank — pimpinan & admin (50/50) */}
       {canApprove && (
         <div className="grid grid-cols-2 gap-4 mb-5">
-          <AnomalyRisikoPanel anomalies={anomalies} loading={anomalyLoading} />
           <BreakdownStrategisPanel rows={revenueBreakdownRows} loading={revenueBreakdownLoading} />
+          <SaldoPerBankPanel
+            rows={saldoPerBankRows}
+            loading={saldoPerBankLoading}
+            periodLabel={periodLabel}
+            filterTo={filterTo}
+          />
         </div>
       )}
 
@@ -306,169 +362,6 @@ export function DashboardPage() {
           </div>
           <TransactionTable limit={5} filterType={txFilterType} filterUnitId={txFilterUnitId} />
         </Card>
-      </div>
-    </div>
-  )
-}
-
-// ── Chart Insight Box ─────────────────────────────────────────────────────────
-
-interface InsightItem {
-  icon:  string
-  color: string
-  bg:    string
-  text:  string
-}
-
-function buildInsights(
-  data:             import('../types').ChartDataPoint[],
-  showPenerimaan:   boolean,
-  showPengeluaran:  boolean,
-  chartView:        ChartView,
-  periodLabel:      string,
-): InsightItem[] {
-  const items: InsightItem[] = []
-  const unitLabel = chartView === 'harian' ? 'hari' : chartView === 'mingguan' ? 'minggu' : 'bulan'
-
-  const totalIn  = data.reduce((s, d) => s + d.penerimaan,  0)
-  const totalOut = data.reduce((s, d) => s + d.pengeluaran, 0)
-  const net      = totalIn - totalOut
-  const nonZeroIn  = data.filter(d => d.penerimaan  > 0)
-  const nonZeroOut = data.filter(d => d.pengeluaran > 0)
-
-  // ── 1. Net cash flow ──
-  if (showPenerimaan && showPengeluaran && (totalIn > 0 || totalOut > 0)) {
-    const ratio = totalOut > 0 ? (totalIn / totalOut) : Infinity
-    if (net > 0) {
-      items.push({
-        icon: 'trending_up', color: '#4ade80', bg: 'rgba(74,222,128,0.1)',
-        text: `Kas bersih <b>surplus ${formatRupiahSingkat(net)}</b> pada ${periodLabel}` +
-              (ratio !== Infinity ? ` — penerimaan ${ratio.toFixed(1)}× lebih besar dari pengeluaran.` : '.'),
-      })
-    } else if (net < 0) {
-      items.push({
-        icon: 'trending_down', color: '#f87171', bg: 'rgba(248,113,113,0.1)',
-        text: `Kas bersih <b>defisit ${formatRupiahSingkat(Math.abs(net))}</b> pada ${periodLabel}` +
-              ` — pengeluaran melampaui penerimaan sebesar ${formatRupiahSingkat(Math.abs(net))}.`,
-      })
-    } else {
-      items.push({
-        icon: 'balance', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)',
-        text: `Penerimaan dan pengeluaran <b>seimbang</b> pada ${periodLabel}.`,
-      })
-    }
-  }
-
-  // ── 2. Puncak penerimaan ──
-  if (showPenerimaan && nonZeroIn.length > 0) {
-    const peak = nonZeroIn.reduce((a, b) => b.penerimaan > a.penerimaan ? b : a)
-    const avg  = totalIn / nonZeroIn.length
-    const mult = avg > 0 ? (peak.penerimaan / avg) : 0
-    items.push({
-      icon: 'arrow_upward', color: '#c4b5fd', bg: 'rgba(196,181,253,0.1)',
-      text: `Penerimaan tertinggi terjadi pada <b>${peak.label}</b> sebesar <b>${formatRupiahSingkat(peak.penerimaan)}</b>` +
-            (mult > 1.5 ? ` — ${mult.toFixed(1)}× di atas rata-rata ${unitLabel} (${formatRupiahSingkat(Math.round(avg))}).` : '.'),
-    })
-  }
-
-  // ── 3. Puncak pengeluaran ──
-  if (showPengeluaran && nonZeroOut.length > 0) {
-    const peak = nonZeroOut.reduce((a, b) => b.pengeluaran > a.pengeluaran ? b : a)
-    const avg  = totalOut / nonZeroOut.length
-    const mult = avg > 0 ? (peak.pengeluaran / avg) : 0
-    items.push({
-      icon: 'arrow_downward', color: '#f9a8d4', bg: 'rgba(249,168,212,0.1)',
-      text: `Pengeluaran terbesar terjadi pada <b>${peak.label}</b> sebesar <b>${formatRupiahSingkat(peak.pengeluaran)}</b>` +
-            (mult > 1.5 ? ` — ${mult.toFixed(1)}× di atas rata-rata ${unitLabel}.` : '.'),
-    })
-  }
-
-  // ── 4. Aktivitas & kepadatan ──
-  if (showPenerimaan && nonZeroIn.length > 0) {
-    const activePct = Math.round((nonZeroIn.length / data.length) * 100)
-    if (activePct < 60) {
-      items.push({
-        icon: 'calendar_today', color: '#67e8f9', bg: 'rgba(103,232,249,0.1)',
-        text: `Penerimaan hanya aktif pada <b>${nonZeroIn.length} dari ${data.length} ${unitLabel}</b> (${activePct}%) — ${100 - activePct}% ${unitLabel} tanpa transaksi masuk.`,
-      })
-    } else {
-      items.push({
-        icon: 'calendar_today', color: '#67e8f9', bg: 'rgba(103,232,249,0.1)',
-        text: `Penerimaan aktif pada <b>${nonZeroIn.length} dari ${data.length} ${unitLabel}</b> (${activePct}%) — aliran kas masuk terjaga dengan baik.`,
-      })
-    }
-  }
-
-  // ── 5. Tren akhir periode (3 titik terakhir vs 3 titik awal) ──
-  if (showPenerimaan && nonZeroIn.length >= 6) {
-    const firstThree = data.slice(0, 3).reduce((s, d) => s + d.penerimaan, 0) / 3
-    const lastThree  = data.slice(-3).reduce((s, d) => s + d.penerimaan, 0) / 3
-    const trendPct   = firstThree > 0 ? Math.round(((lastThree - firstThree) / firstThree) * 100) : 0
-    if (Math.abs(trendPct) >= 10) {
-      items.push({
-        icon:  trendPct > 0 ? 'show_chart' : 'signal_cellular_alt',
-        color: trendPct > 0 ? '#4ade80' : '#f87171',
-        bg:    trendPct > 0 ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)',
-        text:  `Tren penerimaan <b>${trendPct > 0 ? 'naik' : 'turun'} ${Math.abs(trendPct)}%</b> dibanding awal periode — ` +
-               (trendPct > 0 ? 'momentum positif menjelang akhir periode.' : 'perlu perhatian terhadap perlambatan penerimaan.'),
-      })
-    }
-  }
-
-  return items.slice(0, 4)
-}
-
-function ChartInsightBox({
-  data, showPenerimaan, showPengeluaran, chartView, periodLabel,
-}: {
-  data:            import('../types').ChartDataPoint[]
-  showPenerimaan:  boolean
-  showPengeluaran: boolean
-  chartView:       ChartView
-  periodLabel:     string
-}) {
-  const insights = buildInsights(data, showPenerimaan, showPengeluaran, chartView, periodLabel)
-  if (!insights.length) return null
-
-  return (
-    <div
-      className="rounded-xl p-3 mb-4"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-2.5">
-        <span
-          className="material-symbols-outlined flex-shrink-0"
-          style={{ fontSize: '0.85rem', color: '#fbbf24', fontVariationSettings: "'FILL' 1" }}
-        >lightbulb</span>
-        <span className="text-[11px] font-semibold font-headline uppercase tracking-widest" style={{ color: 'rgba(232,234,240,0.5)' }}>
-          Insight Cepat
-        </span>
-      </div>
-
-      {/* Insight list */}
-      <div className="flex flex-col gap-1.5">
-        {insights.map((ins, i) => (
-          <div key={i} className="flex items-start gap-2.5">
-            {/* Icon badge */}
-            <div
-              className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center mt-px"
-              style={{ background: ins.bg }}
-            >
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: '0.75rem', color: ins.color, fontVariationSettings: "'FILL' 1" }}
-              >{ins.icon}</span>
-            </div>
-            {/* Text */}
-            <p
-              className="text-[11.5px] font-body leading-relaxed"
-              style={{ color: 'rgba(232,234,240,0.65)' }}
-              dangerouslySetInnerHTML={{ __html: ins.text.replace(/<b>(.*?)<\/b>/g,
-                `<span style="color:#e8eaf0;font-weight:600">$1</span>`) }}
-            />
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -760,7 +653,7 @@ function BpnPipelineBar({ pipeline }: { pipeline: BpnPipelineData }) {
               <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: s.color, fontVariationSettings: "'FILL' 1" }}>{s.icon}</span>
             </div>
             <p className="text-xl font-bold font-headline tabular-nums" style={{ color: s.color }}>{s.count}</p>
-            <p className="text-[0.65rem] font-body text-center leading-tight" style={{ color: 'rgba(232,234,240,0.45)' }}>{s.label}</p>
+            <p className="text-[10px] font-body text-center leading-tight" style={{ color: 'rgba(232,234,240,0.45)' }}>{s.label}</p>
           </div>
         ))}
       </div>
@@ -792,11 +685,11 @@ function BpnBreakdownSection({ kategori, rekening, loading }: { kategori: BpnKat
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-body" style={{ color: '#e8eaf0' }}>{row.kategori}</span>
-                    <span className="text-[0.65rem] font-body px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(232,234,240,0.45)' }}>{row.count} dok</span>
+                    <span className="text-[10px] font-body px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(232,234,240,0.45)' }}>{row.count} dok</span>
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-semibold font-body tabular-nums" style={{ color: '#e8eaf0' }}>{formatRupiahSingkat(row.total)}</span>
-                    <span className="text-[0.65rem] font-body ml-1.5" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.pct}%</span>
+                    <span className="text-[10px] font-body ml-1.5" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.pct}%</span>
                   </div>
                 </div>
                 <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -829,11 +722,11 @@ function BpnBreakdownSection({ kategori, rekening, loading }: { kategori: BpnKat
                 <div className="flex items-start justify-between mb-1">
                   <div>
                     <p className="text-xs font-semibold font-body" style={{ color: '#e8eaf0' }}>{row.bankName}</p>
-                    <p className="text-[0.65rem] font-body" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.accountNumber} · {row.count} dok</p>
+                    <p className="text-[10px] font-body" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.accountNumber} · {row.count} dok</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-semibold font-body tabular-nums" style={{ color: '#e8eaf0' }}>{formatRupiahSingkat(row.total)}</p>
-                    <p className="text-[0.65rem] font-body" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.pct}%</p>
+                    <p className="text-[10px] font-body" style={{ color: 'rgba(232,234,240,0.4)' }}>{row.pct}%</p>
                   </div>
                 </div>
                 <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -911,17 +804,17 @@ function RekeningAktifSection({ items, loading }: { items: RekeningAktifRow[]; l
                   <p className="text-xs font-semibold font-body truncate" style={{ color: '#e8eaf0' }}>
                     {rek.bankName}
                   </p>
-                  <p className="text-[0.7rem] font-mono mt-0.5" style={{ color: 'rgba(232,234,240,0.5)' }}>
+                  <p className="text-xs font-mono mt-0.5" style={{ color: 'rgba(232,234,240,0.5)' }}>
                     {maskedNum}
                   </p>
-                  <p className="text-[0.65rem] font-body truncate mt-0.5" style={{ color: 'rgba(232,234,240,0.35)' }}>
+                  <p className="text-[10px] font-body truncate mt-0.5" style={{ color: 'rgba(232,234,240,0.35)' }}>
                     {rek.accountName}
                   </p>
                 </div>
                 {/* Badge aktif */}
                 <div className="ml-auto flex-shrink-0">
                   <span
-                    className="inline-flex items-center gap-1 text-[0.6rem] font-semibold font-body px-1.5 py-0.5 rounded-full"
+                    className="inline-flex items-center gap-1 text-[10px] font-semibold font-body px-1.5 py-0.5 rounded-full"
                     style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80' }}
                   >
                     <span className="w-1 h-1 rounded-full inline-block" style={{ background: '#4ade80' }} />
