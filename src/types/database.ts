@@ -170,6 +170,18 @@ export interface DbBankStatement {
   deleted_at: string | null
 }
 
+export interface DbRekeningKoran {
+  id: string
+  tenant_id: string | null
+  account_id: string
+  bulan: number
+  tahun: number
+  drive_url: string
+  keterangan: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
 export interface VwPendapatanSummary {
   tenant_id: string | null
   jenis_pendapatan_id: string
@@ -284,6 +296,12 @@ export interface Database {
         Row: DbBankStatement
         Insert: Omit<DbBankStatement, 'id' | 'created_at' | 'updated_at' | 'deleted_at'>
         Update: Partial<DbBankStatement>
+        Relationships: []
+      }
+      rekening_koran: {
+        Row: DbRekeningKoran
+        Insert: Omit<DbRekeningKoran, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<DbRekeningKoran>
         Relationships: []
       }
     }

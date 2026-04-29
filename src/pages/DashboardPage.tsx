@@ -250,8 +250,8 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Chart + Pending Approvals */}
-      <div className={`grid gap-4 mb-5 ${canApprove ? 'grid-cols-3' : 'grid-cols-1'}`}>
+      {/* Chart + Pending Approvals / Rekening Aktif */}
+      <div className={`grid gap-4 mb-5 ${canApprove ? 'grid-cols-3' : rekeningAktif.length > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
         <Card className={canApprove ? 'col-span-2' : ''} padding="md">
           <div className="flex items-start justify-between mb-4">
             <div>
@@ -312,6 +312,11 @@ export function DashboardPage() {
             )}
           </Card>
         )}
+
+        {/* Rekening Aktif — 50/50 dengan chart (untuk bendahara_penerimaan) */}
+        {!canApprove && rekeningAktif.length > 0 && (
+          <RekeningAktifSection items={rekeningAktif} loading={loading} />
+        )}
       </div>
 
       {/* Breakdown Penerimaan + Saldo per Bank — pimpinan & admin (50/50) */}
@@ -341,12 +346,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Rekening Aktif */}
-      {role === 'bendahara_penerimaan' && rekeningAktif.length > 0 && (
-        <div className="mb-5">
-          <RekeningAktifSection items={rekeningAktif} loading={loading} />
-        </div>
-      )}
+
 
       {/* Transaksi Terkini */}
       <div>
@@ -742,85 +742,58 @@ function BpnBreakdownSection({ kategori, rekening, loading }: { kategori: BpnKat
 }
 
 function RekeningAktifSection({ items, loading }: { items: RekeningAktifRow[]; loading: boolean }) {
-  // Warna avatar bank berdasarkan huruf pertama
-  const AVATAR_COLORS = [
-    { bg: 'rgba(155,109,255,0.15)', color: '#9B6DFF' },
-    { bg: 'rgba(74,222,128,0.12)',  color: '#4ade80' },
-    { bg: 'rgba(251,191,36,0.12)',  color: '#fbbf24' },
-    { bg: 'rgba(248,113,113,0.12)', color: '#f87171' },
-    { bg: 'rgba(56,189,248,0.12)',  color: '#38bdf8' },
-  ]
-
   return (
     <Card padding="md" noLift>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(108,72,209,0.15)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: '#9B6DFF', fontVariationSettings: "'FILL' 1" }}>account_balance</span>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold font-headline" style={{ color: '#e8eaf0' }}>Rekening Aktif</h3>
-            <p className="text-xs font-body" style={{ color: 'rgba(232,234,240,0.4)' }}>
-              {items.length} rekening terdaftar
-            </p>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h3 className="text-sm font-semibold font-headline" style={{ color: '#e8eaf0' }}>Rekening Aktif</h3>
+          <p className="text-[11px] font-body mt-0.5" style={{ color: 'rgba(232,234,240,0.3)' }}>
+            {items.length} rekening terdaftar
+          </p>
         </div>
-        <a href="/pengaturan/rekening" className="text-xs font-medium font-body transition-opacity hover:opacity-80" style={{ color: '#9B6DFF' }}>
-          Kelola Rekening →
+        <a
+          href="/pengaturan/rekening"
+          className="text-[11px] font-body transition-opacity hover:opacity-70"
+          style={{ color: 'rgba(155,109,255,0.6)' }}
+        >
+          Kelola →
         </a>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-3">
-          {[0,1,2].map(i => (
-            <div key={i} className="h-20 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }} />
+        <div className="space-y-2 mt-3">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="h-6 rounded" style={{ background: 'rgba(255,255,255,0.03)' }} />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
-          {items.map((rek, idx) => {
-            const palette = AVATAR_COLORS[idx % AVATAR_COLORS.length]!
-            const initials = rek.bankName.replace(/^(BANK|BRI|BNI|BTN|BSI|MANDIRI|BCA)\s*/i, '')
-              .split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || rek.bankName.slice(0, 2).toUpperCase()
+        <div>
+          {items.map((rek) => {
             const maskedNum = rek.accountNumber.length > 6
               ? `${rek.accountNumber.slice(0, 3)}···${rek.accountNumber.slice(-4)}`
               : rek.accountNumber
-
             return (
               <div
                 key={rek.id}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                className="flex items-center justify-between py-2"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
               >
-                {/* Avatar */}
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold font-headline"
-                  style={{ background: palette.bg, color: palette.color }}
-                >
-                  {initials}
-                </div>
-                {/* Info */}
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold font-body truncate" style={{ color: '#e8eaf0' }}>
-                    {rek.bankName}
-                  </p>
-                  <p className="text-xs font-mono mt-0.5" style={{ color: 'rgba(232,234,240,0.5)' }}>
-                    {maskedNum}
-                  </p>
-                  <p className="text-[10px] font-body truncate mt-0.5" style={{ color: 'rgba(232,234,240,0.35)' }}>
-                    {rek.accountName}
-                  </p>
-                </div>
-                {/* Badge aktif */}
-                <div className="ml-auto flex-shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold font-body px-1.5 py-0.5 rounded-full"
-                    style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80' }}
+                    className="material-symbols-outlined flex-shrink-0"
+                    style={{ fontSize: '0.75rem', color: 'rgba(232,234,240,0.2)', fontVariationSettings: "'FILL' 0" }}
                   >
-                    <span className="w-1 h-1 rounded-full inline-block" style={{ background: '#4ade80' }} />
-                    Aktif
+                    account_balance
+                  </span>
+                  <span className="text-[11px] font-body truncate" style={{ color: 'rgba(232,234,240,0.7)' }}>
+                    {rek.bankName}
+                  </span>
+                  <span className="text-[10px] font-mono flex-shrink-0" style={{ color: 'rgba(232,234,240,0.28)' }}>
+                    {maskedNum}
                   </span>
                 </div>
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-3" style={{ background: '#4ade80', display: 'inline-block', opacity: 0.6 }} />
               </div>
             )
           })}
@@ -829,7 +802,6 @@ function RekeningAktifSection({ items, loading }: { items: RekeningAktifRow[]; l
     </Card>
   )
 }
-
 function BpnActionTable({ items }: { items: BpnActionItem[] }) {
   return (
     <Card padding="md" noLift>

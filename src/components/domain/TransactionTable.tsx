@@ -895,7 +895,7 @@ function TransactionRow({
       </TableCell>
       <TableCell>
         <div>
-          <span className="text-sm font-body" style={{ color: '#e8eaf0' }}>{t.deskripsi}</span>
+          <span className="text-xs font-body" style={{ color: '#e8eaf0' }}>{t.deskripsi}</span>
           {t.status === 'ditolak' && t.rejectionNote && (
             <p className="text-xs font-body mt-0.5 italic" style={{ color: '#f87171' }}>Catatan: {t.rejectionNote}</p>
           )}
@@ -926,7 +926,7 @@ function TransactionRow({
 
       <TableCell align="right">
         <span
-          className="font-data font-medium tabular-nums tracking-financial text-sm"
+          className="font-data font-medium tabular-nums tracking-financial text-xs"
           style={{ color: t.type === 'penerimaan' ? '#4ade80' : '#e8eaf0' }}
         >
           {t.type === 'penerimaan' ? '+' : '-'}{formatRupiah(t.nominal)}
